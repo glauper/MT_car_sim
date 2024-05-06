@@ -65,6 +65,14 @@
 			"steering angle limits": [-60, 60]
 		}
 	} ,
+	"Ego Entrance": {
+		"position": [3, -22],
+		"orientation": 90,
+		"speed limit": 2,
+		"offset": [0, 5],
+		"targets": [0, 2, 3],
+		"waypoints": [[3, -6]]
+	},
 	"Entrances": {
 		"0": {
 			"position": [-22, -3],

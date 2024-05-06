@@ -87,6 +87,9 @@ class Vehicle:
         self.position = np.array([self.x, self.y]).reshape(2,1)
         self.theta = state[2]
         self.velocity = state[3]
+        self.entering = True
+        self.exiting = False
+
 
     def dynamics_propagation(self, input, delta_t):
         beta = np.arctan(self.l_r/(self.l_r + self.l_f) * np.tan(input[1]))
@@ -145,14 +148,13 @@ class Vehicle:
 
         # Initial state
         opti.subject_to(X[:, 0] == self.state)
+
         # Constraint for the steady state
         opti.subject_to(self.A_x @ x_s <= self.b_x)
         opti.subject_to(self.A_u @ u_s <= self.b_u)
         opti.subject_to(self.dynamics_constraints(x_s, x_s, u_s))
         # Terminal constraints
         opti.subject_to(X[:, -1] == x_s)  # x(N) == x_s
-
-
 
         """# Aviodance of other agents
         if nr_agents >= 1:

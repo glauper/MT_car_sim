@@ -59,12 +59,14 @@ def results_init(env, agents):
 
     return results
 
-def results_update_and_save(env, agent, id_agent, results):
+def results_update_and_save(env, agent, id_agent, results, env_nr):
 
     results[f'agent {id_agent}']['x coord'].append(float(agent.x))
     results[f'agent {id_agent}']['y coord'].append(float(agent.y))
     results[f'agent {id_agent}']['velocity'].append(float(agent.velocity))
     results[f'agent {id_agent}']['theta'].append(float(agent.theta))
+
+    env['env number'] = env_nr
 
     results_path = os.path.join(os.path.dirname(__file__), ".","../save_results/results.txt")
     env_path = os.path.join(os.path.dirname(__file__), ".", "../save_results/env.txt")

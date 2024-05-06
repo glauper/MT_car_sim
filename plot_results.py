@@ -17,4 +17,4 @@ with open(env_path, 'r') as file:
     file_content = file.read()
 env = json.loads(file_content)
 
-plot_simulation(0, env, results)
+plot_simulation(env['env number'], env, results)

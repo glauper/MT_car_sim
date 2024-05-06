@@ -4,6 +4,7 @@ from config.config import SimulationConfig, EnviromentConfig
 from functions.plot_functions import plot_simulation
 from functions.sim_initialization import results_init, results_update_and_save
 from env_controller import EnvController
+from priority_controller import PriorityController
 from vehicle import Vehicle
 
 SimulationParam = SimulationConfig()
@@ -27,7 +28,8 @@ previuos_opt_sol = {
     'x_s agent 0': agents['0'].state,
     'u_s agent 0': np.zeros((2, 1))
 }
-env_controller = EnvController(SimulationParam['Controller']['Horizon'], {}, circular_obstacles)
+
+priority = PriorityController("tracking MPC", SimulationParam['Environment'], env)
 
 t = 0
 run_simulation = True
@@ -38,7 +40,7 @@ while run_simulation:
     print("Simulation time: ", t)
     # Save the results
     for id_vehicle in range(env['Number Vehicles']):
-        results = results_update_and_save(env, agents[f'{id_vehicle}'], id_vehicle, results)
+        results = results_update_and_save(env, agents[f'{id_vehicle}'], id_vehicle, results, SimulationParam['Environment'])
 
     # This is a controller that optimize the trajectory of one agent at time
     other_agents = {}
@@ -46,14 +48,15 @@ while run_simulation:
     for id_vehicle in range(env['Number Vehicles']):
         input[f'agent {id_vehicle}'] = agents[f'{id_vehicle}'].trackingMPC(other_agents, circular_obstacles, t)
         other_agents[f'{id_vehicle}'] = agents[f'{id_vehicle}']
-        agents[f'{id_vehicle}'].dynamics_propagation(input[f'agent {id_vehicle}'], delta_t)
 
     """# This is a controller that have to optimize the trajecotry of all agent in the same time
-    input = env_controller.tracking_MPC(agents, t)
-    for id_vehicle in range(env['Number Vehicles']):
-        agents[f'{id_vehicle}'].dynamics_propagation(input[f'agent {id_vehicle}'], delta_t)"""
+    input = env_controller.tracking_MPC(agents, t)"""
 
-    # Check if any agents have reach a target and change it in case
+    # Dynamics propagation
+    for id_vehicle in range(env['Number Vehicles']):
+        agents[f'{id_vehicle}'].dynamics_propagation(input[f'agent {id_vehicle}'], delta_t)
+
+    """# Check if any agents have reach a target and change it in case
     for id_vehicle in range(env['Number Vehicles']):
         distance_target = np.linalg.norm(agents[f'{id_vehicle}'].position - agents[f'{id_vehicle}'].target[0:2])
         if agents[f'{id_vehicle}'].waypoints_status != 0 and distance_target <= 1:
@@ -75,12 +78,15 @@ while run_simulation:
                             options_entrance.remove(key_init)
                             key_init = random.choice(options_entrance)
                             agents[f'{id_vehicle}'].init_state(env, key_init)
+                            #Change the type of vehicle!
                         else:
                             checks.append(True)
                 if all(checks) == True:
                     flag = False
                 else:
-                    flag = True
+                    flag = True"""
+
+    agents = priority.NoPriority(agents)
 
     for id_vehicle in range(env['Number Vehicles']):
         for id_other_vehicle in range(env['Number Vehicles']):
@@ -95,6 +101,6 @@ while run_simulation:
 
 # Save the results
 for id_vehicle in range(env['Number Vehicles']):
-    results = results_update_and_save(env, agents[f'{id_vehicle}'], id_vehicle, results)
+    results = results_update_and_save(env, agents[f'{id_vehicle}'], id_vehicle, results, SimulationParam['Environment'])
 
 plot_simulation(SimulationParam['Environment'], env, results)
