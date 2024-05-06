@@ -1,0 +1,5 @@
+{
+    		"objective": "ca.norm_2(x - np.array([[20], [90]]))**2",
+    		"equality_constraints": [],
+    		"inequality_constraints": []
+}

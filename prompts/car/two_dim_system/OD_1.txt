@@ -1,0 +1,5 @@
+{
+    		"objective": "10",
+    		"equality_constraints": ["x['car_0'] - x0['car_0']"],
+    		"inequality_constraints": []
+}

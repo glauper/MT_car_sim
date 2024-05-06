@@ -1,0 +1,69 @@
+{"env": {
+	"Number Vehicles": 2,
+	"Number Pedestrians": 0,
+	"State space": {
+		"x limits": [-25, 25],
+		"y limits": [-25, 25]
+	},
+	"Visual state space": {
+		"x limits": [-15, 15],
+		"y limits": [-15, 15]
+	},
+	"Road Limits": {
+		"0": {
+			"line x": [-25, 25],
+			"line y": [6, 6],
+			"center": [0, 6],
+			"radius": [25, 0.5]},
+		"1": {
+			"line x": [25, -25],
+			"line y": [-6, -6],
+			"center": [0, -6],
+			"radius": [25, 0.5]}
+		},
+
+	"Vehicle Specification": {
+		"types": ["standard_car"],
+		"standard_car": {
+			"length": 3,
+			"width": 2,
+			"l_f": 1,
+			"l_r": 1,
+			"security distance": 3,
+			"velocity limits": [-3, 33],
+			"acceleration limits": [-3, 3],
+			"steering angle limits": [-60, 60]
+		}
+	} ,
+	"Entrances": {
+		"0": {
+			"position": [-22, -3],
+			"orientation": 0,
+			"speed limit": 2,
+			"offset": [5, 0],
+			"targets": [1],
+			"waypoints": [[-6, -3]]
+		},
+		"1": {
+			"position": [22, 3],
+			"orientation": 180,
+			"speed limit": 2,
+			"offset": [-5, 0],
+			"targets": [0],
+			"waypoints": [[6, 3]]}
+	},
+	"Exits": {
+		"0": {
+			"position": [-18, 3],
+			"orientation": 180,
+			"speed limit": 8,
+			"waypoints": [[-6, 3]]
+		},
+		"1": {
+			"position": [18, -3],
+			"orientation": 0,
+			"speed limit": 8,
+			"waypoints": [[6, -3]]}
+		}
+	}
+}

@@ -1,0 +1,1 @@
+{"tasks": ["move the cart to position (31.728414980980245, 97.25126747987596)", "move the cart to package_1 position", "pick_up()", "move the cart to package_2 position", "pick_up()", "move the cart to position (-29.10468535820497, 46.5139741236765)", "move the cart to package_3 position", "pick_up()", "move the cart to home position", "deliver()"]}

@@ -1,0 +1,17 @@
+{
+	"Subtask_1": "move the cart to the position of package_1 with velocity equal to zero",
+
+	"Subtask_2": "pick up package_1",
+
+	"Subtask_3": "move the cart to the position of package_2 with velocity equal to zero",
+
+	"Subtask_4": "pick up package_2",
+
+	"Subtask_5": "move the cart to the position of package_3 with velocity equal to zero",
+
+	"Subtask_6": "pick up package_3",
+
+	"Subtask_7": "move the cart to the home position with velocity equal to zero",
+
+	"Subtask_8": "deliver all three packages"
+}    

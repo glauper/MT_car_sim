@@ -1,0 +1,8 @@
+{
+  "tasks": [
+    "car_1: do nothing. car_2: do nothing. car_3: go to West. car_4: do nothing. car_5: do nothing",
+    "car_1: do nothing. car_2: do nothing. car_3: do nothing. car_4: go to North. car_5: go to East",
+    "car_1: go to North. car_2: do nothing. car_3: do nothing. car_4: do nothing. car_5: do nothing",
+    "car_1: do nothing. car_2: go to South. car_3: do nothing. car_4: do nothing. car_5: do nothing"
+  ]
+}

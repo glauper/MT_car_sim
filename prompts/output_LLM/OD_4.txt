@@ -1,0 +1,1 @@
+{"objective": "ca.norm_2(x - np.array([[-29.10468535820497], [46.5139741236765]]))**2", "equality_constraints": [], "inequality_constraints": []}
