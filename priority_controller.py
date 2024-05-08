@@ -128,6 +128,7 @@ class PriorityController:
             if True in priority:
                 id_priority_vehicle = ids_entering[priority.index(True)]
                 if len(id_priority_vehicle) > 1:
+                    print('Ambiguous priority')
                     error()
 
                 if len(ids_exiting) >= 1:
@@ -139,7 +140,7 @@ class PriorityController:
                             dist_own_target = np.linalg.norm(agents[id_priority_vehicle].position - agents[id_priority_vehicle].target[0:2])
                             if dist_agent_to_agent <= max(agents[id_priority_vehicle].security_dist, agents[id_other_agent].security_dist) + 0.5:
                                 check_traffic = False
-                            elif dist_agent_to_target >= 2:
+                            elif dist_agent_to_target >= 4:
                                 check_traffic = False
                             elif dist_own_target >= 1:
                                 check_traffic = False
@@ -160,11 +161,12 @@ class PriorityController:
             distance_target = np.linalg.norm(agents[id_agent].position - agents[id_agent].target[0:2])
             if len(agents[id_agent].waypoints_entering) != 0 and distance_target <= 1:
                 agents[id_agent].target = agents[id_agent].waypoints_entering.pop(0)
-            elif len(agents[id_agent].waypoints_exiting) != 0 and distance_target <= 2:
+            elif len(agents[id_agent].waypoints_exiting) != 0 and distance_target <= 1:
                 agents[id_agent].target = agents[id_agent].waypoints_exiting.pop(0)
-            elif len(agents[id_agent].waypoints_exiting) == 0 and distance_target <= 6:
+            elif len(agents[id_agent].waypoints_exiting) == 0 and distance_target <= 1:
                 agents[id_agent].exiting = False
                 agents[id_agent].entering = False
+                agents[id_agent].security_dist = 0
 
         return agents
 

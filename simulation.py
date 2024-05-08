@@ -22,12 +22,10 @@ for i in range(env['Number Vehicles']):
     options_init_state.remove(key_init)
     agents[f'{i}'].init_trackingMPC(SimulationParam['Controller']['Horizon'])
 
-previuos_opt_sol = {
-    'X agent 0': np.tile(agents['0'].state, (1, 20 + 1)).reshape(4, 20 + 1),
-    'U agent 0': np.tile(np.zeros((2, 1)), (1, 20)).reshape(2, 20),
-    'x_s agent 0': agents['0'].state,
-    'u_s agent 0': np.zeros((2, 1))
-}
+type = env['Vehicle Specification']['types'][0]
+info_vehicle = env['Vehicle Specification'][type]
+ego_vehicle = Vehicle(type, info_vehicle, delta_t)
+ego_vehicle.init_state(env, "Ego Entrance")
 
 priority = PriorityController("tracking MPC", SimulationParam['Environment'], env)
 
@@ -42,16 +40,22 @@ while run_simulation:
     for id_vehicle, name_vehicle in enumerate(agents):
         results = results_update_and_save(env, agents[name_vehicle], id_vehicle, results, SimulationParam['Environment'])
 
+    # Controller for ego vehicle
+
     # This is a controller that optimize the trajectory of one agent at time
     other_agents = {}
     input = {}
     for id_vehicle, name_vehicle in enumerate(agents):
-        input[f'agent {id_vehicle}'] = agents[name_vehicle].trackingMPC(other_agents, circular_obstacles, t)
-        other_agents[name_vehicle] = agents[name_vehicle]
+        if agents[name_vehicle].entering or agents[name_vehicle].exiting:
+            input[f'agent {id_vehicle}'] = agents[name_vehicle].trackingMPC(other_agents, circular_obstacles, t)
+            other_agents[name_vehicle] = agents[name_vehicle]
 
     # Dynamics propagation
     for id_vehicle, name_vehicle in enumerate(agents):
-        agents[name_vehicle].dynamics_propagation(input[f'agent {id_vehicle}'], delta_t)
+        if agents[name_vehicle].entering or agents[name_vehicle].exiting:
+            agents[name_vehicle].dynamics_propagation(input[f'agent {id_vehicle}'])
+        else:
+            agents[name_vehicle].brakes()
 
     """# Check if any agents have reach a target and change it in case
     for id_vehicle in range(env['Number Vehicles']):

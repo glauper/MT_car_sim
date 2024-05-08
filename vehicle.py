@@ -48,28 +48,50 @@ class Vehicle:
         self.b_u[3, 0] = -self.steering_limits[0] * (np.pi / 180)
 
     def init_state(self, env, key_init):
+        if key_init == 'Ego Entrance':
+            state = np.zeros((4, 1))
+            state[0:2, 0] = env['Ego Entrance']['position']
+            state[2, 0] = env['Ego Entrance']['orientation'] * (np.pi / 180)  # form degrees in radiants
+            state[3, 0] = 0
 
-        state = np.zeros((4, 1))
-        state[0:2, 0] = env['Entrances'][key_init]['position']
-        state[2, 0] = env['Entrances'][key_init]['orientation'] * (np.pi / 180)  # form degrees in radiants
-        state[3, 0] = random.randint(0, env['Entrances'][key_init]['speed limit'])
+            key_target = str(env['Ego Entrance']['targets'][0])
+            target = np.zeros((4, 1))
+            target[0:2, 0] = env['Exits'][key_target]['position']
+            target[2, 0] = env['Exits'][key_target]['orientation'] * (np.pi / 180)  # form degrees in radiants
+            # target[3, 0] = env['Exits'][key_target]['speed limit']
+            target[3, 0] = 0
 
-        key_target = str(random.choice(env['Entrances'][key_init]['targets']))
-        target = np.zeros((4, 1))
-        target[0:2, 0] = env['Exits'][key_target]['position']
-        target[2, 0] = env['Exits'][key_target]['orientation'] * (np.pi / 180)  # form degrees in radiants
-        #target[3, 0] = env['Exits'][key_target]['speed limit']
-        target[3, 0] = 0
+            self.waypoints_entering = []
+            for i in range(len(env['Ego Entrance']['waypoints'])):
+                point = np.zeros((4, 1))
+                point[0, 0] = env['Ego Entrance']['waypoints'][i][0]
+                point[1, 0] = env['Ego Entrance']['waypoints'][i][1]
+                point[2, 0] = env['Ego Entrance']['orientation'] * (np.pi / 180)
+                # point[3, 0] = env['Entrances'][key_init]['speed limit']
+                point[3, 0] = 0
+                self.waypoints_entering.append(point)
+        else:
+            state = np.zeros((4, 1))
+            state[0:2, 0] = env['Entrances'][key_init]['position']
+            state[2, 0] = env['Entrances'][key_init]['orientation'] * (np.pi / 180)  # form degrees in radiants
+            state[3, 0] = random.randint(0, env['Entrances'][key_init]['speed limit'])
 
-        self.waypoints_entering = []
-        for i in range(len(env['Entrances'][key_init]['waypoints'])):
-            point = np.zeros((4,1))
-            point[0, 0] = env['Entrances'][key_init]['waypoints'][i][0]
-            point[1, 0] = env['Entrances'][key_init]['waypoints'][i][1]
-            point[2, 0] = env['Entrances'][key_init]['orientation'] * (np.pi / 180)
-            #point[3, 0] = env['Entrances'][key_init]['speed limit']
-            point[3, 0] = 0
-            self.waypoints_entering.append(point)
+            key_target = str(random.choice(env['Entrances'][key_init]['targets']))
+            target = np.zeros((4, 1))
+            target[0:2, 0] = env['Exits'][key_target]['position']
+            target[2, 0] = env['Exits'][key_target]['orientation'] * (np.pi / 180)  # form degrees in radiants
+            #target[3, 0] = env['Exits'][key_target]['speed limit']
+            target[3, 0] = 0
+
+            self.waypoints_entering = []
+            for i in range(len(env['Entrances'][key_init]['waypoints'])):
+                point = np.zeros((4,1))
+                point[0, 0] = env['Entrances'][key_init]['waypoints'][i][0]
+                point[1, 0] = env['Entrances'][key_init]['waypoints'][i][1]
+                point[2, 0] = env['Entrances'][key_init]['orientation'] * (np.pi / 180)
+                #point[3, 0] = env['Entrances'][key_init]['speed limit']
+                point[3, 0] = 0
+                self.waypoints_entering.append(point)
 
         self.waypoints_exiting = []
         for i in range(len(env['Exits'][key_target]['waypoints'])):
@@ -94,15 +116,29 @@ class Vehicle:
         self.exiting = False
 
 
-    def dynamics_propagation(self, input, delta_t):
+    def dynamics_propagation(self, input):
         beta = np.arctan(self.l_r/(self.l_r + self.l_f) * np.tan(input[1]))
-        self.x = self.x + delta_t * self.velocity * np.cos(self.theta + beta)
-        self.y = self.y + delta_t * self.velocity * np.sin(self.theta + beta)
-        self.theta = self.theta + delta_t * self.velocity / self.l_r * np.sin(beta)
-        self.velocity = self.velocity + delta_t * input[0]
+        self.x = self.x + self.delta_t * self.velocity * np.cos(self.theta + beta)
+        self.y = self.y + self.delta_t * self.velocity * np.sin(self.theta + beta)
+        self.theta = self.theta + self.delta_t * self.velocity / self.l_r * np.sin(beta)
+        self.velocity = self.velocity + self.delta_t * input[0]
 
         self.state = np.array([self.x, self.y, self.theta, self.velocity]).reshape((4,1))
         self.position = np.array([self.x, self.y]).reshape(2,1)
+
+    def brakes(self):
+        beta = np.arctan(self.l_r / (self.l_r + self.l_f) * np.tan(0))
+        input = 0 - self.velocity
+        if self.acc_limits[0] > input:
+            input = self.acc_limits[1]
+        self.velocity = self.velocity + self.delta_t * input
+
+        self.x = self.x + self.delta_t * self.velocity * np.cos(self.theta + beta)
+        self.y = self.y + self.delta_t * self.velocity * np.sin(self.theta + beta)
+        self.theta = self.theta + self.delta_t * self.velocity / self.l_r * np.sin(beta)
+
+        self.state = np.array([self.x, self.y, self.theta, self.velocity]).reshape((4, 1))
+        self.position = np.array([self.x, self.y]).reshape(2, 1)
 
 
     def dynamics_constraints(self, x_next, x_now, u_now):

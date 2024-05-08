@@ -70,8 +70,8 @@
 		"orientation": 90,
 		"speed limit": 2,
 		"offset": [0, 5],
-		"targets": [0, 2, 3],
-		"waypoints": [[3, -6]]
+		"targets": [0],
+		"waypoints": [[3, -7]]
 	},
 	"Entrances": {
 		"0": {
