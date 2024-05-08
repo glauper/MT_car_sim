@@ -39,22 +39,19 @@ options_entrance = list(env['Entrances'].keys())
 while run_simulation:
     print("Simulation time: ", t)
     # Save the results
-    for id_vehicle in range(env['Number Vehicles']):
-        results = results_update_and_save(env, agents[f'{id_vehicle}'], id_vehicle, results, SimulationParam['Environment'])
+    for id_vehicle, name_vehicle in enumerate(agents):
+        results = results_update_and_save(env, agents[name_vehicle], id_vehicle, results, SimulationParam['Environment'])
 
     # This is a controller that optimize the trajectory of one agent at time
     other_agents = {}
     input = {}
-    for id_vehicle in range(env['Number Vehicles']):
-        input[f'agent {id_vehicle}'] = agents[f'{id_vehicle}'].trackingMPC(other_agents, circular_obstacles, t)
-        other_agents[f'{id_vehicle}'] = agents[f'{id_vehicle}']
-
-    """# This is a controller that have to optimize the trajecotry of all agent in the same time
-    input = env_controller.tracking_MPC(agents, t)"""
+    for id_vehicle, name_vehicle in enumerate(agents):
+        input[f'agent {id_vehicle}'] = agents[name_vehicle].trackingMPC(other_agents, circular_obstacles, t)
+        other_agents[name_vehicle] = agents[name_vehicle]
 
     # Dynamics propagation
-    for id_vehicle in range(env['Number Vehicles']):
-        agents[f'{id_vehicle}'].dynamics_propagation(input[f'agent {id_vehicle}'], delta_t)
+    for id_vehicle, name_vehicle in enumerate(agents):
+        agents[name_vehicle].dynamics_propagation(input[f'agent {id_vehicle}'], delta_t)
 
     """# Check if any agents have reach a target and change it in case
     for id_vehicle in range(env['Number Vehicles']):
@@ -86,21 +83,25 @@ while run_simulation:
                 else:
                     flag = True"""
 
-    agents = priority.NoPriority(agents)
+    #agents = priority.NoPriority(agents)
+    agents = priority.SwissPriority(agents)
 
-    for id_vehicle in range(env['Number Vehicles']):
-        for id_other_vehicle in range(env['Number Vehicles']):
-            if id_vehicle != id_other_vehicle:
-                dist = np.linalg.norm(agents[f'{id_vehicle}'].position - agents[f'{id_other_vehicle}'].position)
-                if dist <= 3:
-                    print('Distance: ', dist)
+    reach_end_target = []
+    for name_agent in agents:
+        if agents[name_agent].entering == False and agents[name_agent].exiting == False:
+            reach_end_target.append(True)
+        else:
+            reach_end_target.append(False)
+
+    if all(reach_end_target):
+        run_simulation = False
 
     t += 1
     if t == 200:
         run_simulation = False
 
 # Save the results
-for id_vehicle in range(env['Number Vehicles']):
-    results = results_update_and_save(env, agents[f'{id_vehicle}'], id_vehicle, results, SimulationParam['Environment'])
+for id_vehicle, name_vehicle in enumerate(agents):
+    results = results_update_and_save(env, agents[name_vehicle], id_vehicle, results, SimulationParam['Environment'])
 
 plot_simulation(SimulationParam['Environment'], env, results)

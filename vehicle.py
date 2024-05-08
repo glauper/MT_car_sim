@@ -28,8 +28,8 @@ class Vehicle:
         self.b_x[1, 0] = -state_space["x limits"][0]
         self.b_x[2, 0] = state_space["y limits"][1]
         self.b_x[3, 0] = -state_space["y limits"][0]
-        self.b_x[4, 0] = np.pi
-        self.b_x[5, 0] = np.pi
+        self.b_x[4, 0] = 2 * np.pi
+        self.b_x[5, 0] = 2 * np.pi
         if street_vel_limit <= self.vel_limits[1]:
             self.b_x[6, 0] = street_vel_limit
         else:
@@ -58,29 +58,32 @@ class Vehicle:
         target = np.zeros((4, 1))
         target[0:2, 0] = env['Exits'][key_target]['position']
         target[2, 0] = env['Exits'][key_target]['orientation'] * (np.pi / 180)  # form degrees in radiants
-        target[3, 0] = env['Exits'][key_target]['speed limit']
+        #target[3, 0] = env['Exits'][key_target]['speed limit']
+        target[3, 0] = 0
 
-        self.waypoints = []
+        self.waypoints_entering = []
         for i in range(len(env['Entrances'][key_init]['waypoints'])):
             point = np.zeros((4,1))
             point[0, 0] = env['Entrances'][key_init]['waypoints'][i][0]
             point[1, 0] = env['Entrances'][key_init]['waypoints'][i][1]
             point[2, 0] = env['Entrances'][key_init]['orientation'] * (np.pi / 180)
-            point[3, 0] = env['Entrances'][key_init]['speed limit']
-            self.waypoints.append(point)
+            #point[3, 0] = env['Entrances'][key_init]['speed limit']
+            point[3, 0] = 0
+            self.waypoints_entering.append(point)
 
+        self.waypoints_exiting = []
         for i in range(len(env['Exits'][key_target]['waypoints'])):
             point = np.zeros((4,1))
             point[0, 0] = env['Exits'][key_target]['waypoints'][i][0]
             point[1, 0] = env['Exits'][key_target]['waypoints'][i][1]
             point[2, 0] = env['Exits'][key_target]['orientation'] * (np.pi / 180)
-            point[3, 0] = env['Exits'][key_target]['speed limit']
-            self.waypoints.append(point)
+            #point[3, 0] = env['Exits'][key_target]['speed limit']
+            point[3, 0] = 0
+            self.waypoints_exiting.append(point)
 
-        self.waypoints.append(target)
+        self.waypoints_exiting.append(target)
 
-        self.target = self.waypoints.pop(0)
-        self.waypoints_status = len(self.waypoints)
+        self.target = self.waypoints_entering.pop(0)
         self.state = state
         self.x = state[0]
         self.y = state[1]
@@ -122,6 +125,13 @@ class Vehicle:
 
     def trackingMPC(self, other_agents, circular_obstacles, t):
 
+        if self.state[2] > 0 and self.target[2] < 0:
+            if self.target[2] < self.state[2] - np.pi:
+                self.target[2] += 2 * np.pi
+        elif self.state[2] < 0 and self.target[2] > 0:
+            if self.target[2] > self.state[2] + np.pi:
+                self.target[2] -= 2 * np.pi
+
         nr_agents = len(other_agents)
         opti = ca.Opti()
 
@@ -155,23 +165,6 @@ class Vehicle:
         opti.subject_to(self.dynamics_constraints(x_s, x_s, u_s))
         # Terminal constraints
         opti.subject_to(X[:, -1] == x_s)  # x(N) == x_s
-
-        """# Aviodance of other agents
-        if nr_agents >= 1:
-            for k in range(self.N + 1):
-                for other_agent in other_agents:
-                    for i in range(np.shape(other_agents[other_agent].previous_opt_sol['X'])[1]):
-                        diff = X[0:2, k] - other_agents[other_agent].previous_opt_sol['X'][0:2, i]
-                        opti.subject_to(ca.transpose(diff) @ diff >= self.security_dist ** 2)"""
-
-        """# Avoidance of other agents
-        if nr_agents >= 1:
-            for k in range(self.N + 1):
-                for other_agent in other_agents:
-                    diff = X[0:2, k] - other_agents[other_agent].position
-                    # Which of the distance have to keep? mine or of the other one? Or one standard for all
-                    opti.subject_to(ca.transpose(diff) @ diff >= self.security_dist ** 2)
-                    opti.subject_to(ca.transpose(diff) @ diff >= other_agents[other_agent].security_dist ** 2)"""
 
         # Aviodance of other agents
         if nr_agents >= 1:
@@ -224,6 +217,13 @@ class Vehicle:
 
 
         input = sol.value(U)[:, 0].reshape((self.m, 1))
+
+        if self.state[2] > 0 and self.target[2] < 0:
+            if self.target[2] < self.state[2] - np.pi:
+                self.target[2] -= 2 * np.pi
+        elif self.state[2] < 0 and self.target[2] > 0:
+            if self.target[2] > self.state[2] + np.pi:
+                self.target[2] += 2 * np.pi
 
         return input
 
