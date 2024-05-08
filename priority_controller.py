@@ -11,8 +11,8 @@ class PriorityController:
         A = np.zeros((4, 2))
         A[0, 0] = 1
         A[1, 0] = -1
-        A[0, 1] = 1
-        A[1, 1] = -1
+        A[2, 1] = 1
+        A[3, 1] = -1
 
         b = np.zeros((4, 1))
         b[0,0] = env['Priority space']['x limits'][1]
@@ -90,16 +90,14 @@ class PriorityController:
         if len(ids_entering) != 0:
             if len(ids_entering) == 1:
                 priority = [True]
-            elif len(ids_entering) > 1:
+            if len(ids_entering) > 1:
                 priority = [False] * len(ids_entering)
                 for i, id_agent in enumerate(ids_entering):
                     priority_i = True
                     for j, id_other_agent in enumerate(ids_entering):
                         if id_agent != id_other_agent:
-                            diff = -(agents[id_agent].target[0:2] - agents[id_other_agent].target[0:2])
                             dist_i = np.linalg.norm(agents[id_agent].target[0:2] - agents[id_agent].position)
                             dist_j = np.linalg.norm(agents[id_other_agent].target[0:2] - agents[id_other_agent].position)
-                            theta = np.arctan2(diff[1], diff[0])
                             """# If the car is near enough to the target we consider some priorities
                             if dist_i <= 10:
                                 # If the other car is less than 5m more distant from the target, then we give anyway the priority
@@ -127,16 +125,6 @@ class PriorityController:
                     if priority_i:
                         priority[i] = True
 
-                """# Here in case there are more than one agent near the cross, but there is no clear priority -> one random goes
-                if all(priority) == False:
-                    stuck_agents = []
-                    for i, id_agent in enumerate(ids_entering):
-                        dist_i = np.linalg.norm(agents[id_agent].target[0:2] - agents[id_agent].position)
-                        if dist_i <= 1:
-                            stuck_agents.append(i)
-                    if len(stuck_agents) > 1:
-                        priority[random.choice(stuck_agents)] = True"""
-
             if True in priority:
                 id_priority_vehicle = ids_entering[priority.index(True)]
                 if len(id_priority_vehicle) > 1:
@@ -149,7 +137,7 @@ class PriorityController:
                             dist_agent_to_agent = np.linalg.norm(agents[id_priority_vehicle].position - agents[id_other_agent].position)
                             dist_agent_to_target = np.linalg.norm(agents[id_other_agent].position - agents[id_other_agent].target[0:2])
                             dist_own_target = np.linalg.norm(agents[id_priority_vehicle].position - agents[id_priority_vehicle].target[0:2])
-                            if dist_agent_to_agent <= 5:
+                            if dist_agent_to_agent <= max(agents[id_priority_vehicle].security_dist, agents[id_other_agent].security_dist) + 0.5:
                                 check_traffic = False
                             elif dist_agent_to_target >= 2:
                                 check_traffic = False

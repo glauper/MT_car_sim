@@ -83,14 +83,6 @@
 			"waypoints": [[-7, -3]]
 		},
 		"1": {
-			"position": [3, -22],
-			"orientation": 90,
-			"speed limit": 2,
-			"offset": [0, 5],
-			"targets": [0, 2, 3],
-			"waypoints": [[3, -7]]
-		},
-		"2": {
 			"position": [22, 3],
 			"orientation": 180,
 			"speed limit": 2,
@@ -98,7 +90,7 @@
 			"targets": [1, 0, 3],
 			"waypoints": [[7, 3]]
 		},
-		"3": {
+		"2": {
 			"position": [-3, 22],
 			"orientation": -90,
 			"speed limit": 2,
