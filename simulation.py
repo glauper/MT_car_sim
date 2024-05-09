@@ -33,6 +33,7 @@ t = 0
 run_simulation = True
 results = results_init(env, agents)
 options_entrance = list(env['Entrances'].keys())
+order_optimization = list(agents.keys())
 
 while run_simulation:
     print("Simulation time: ", t)
@@ -45,7 +46,9 @@ while run_simulation:
     # This is a controller that optimize the trajectory of one agent at time
     other_agents = {}
     input = {}
-    for id_vehicle, name_vehicle in enumerate(agents):
+    #for id_vehicle, name_vehicle in enumerate(agents):
+    for name_vehicle in order_optimization:
+        id_vehicle = int(name_vehicle)
         if agents[name_vehicle].entering or agents[name_vehicle].exiting:
             input[f'agent {id_vehicle}'] = agents[name_vehicle].trackingMPC(other_agents, circular_obstacles, t)
             other_agents[name_vehicle] = agents[name_vehicle]
@@ -88,7 +91,7 @@ while run_simulation:
                     flag = True"""
 
     #agents = priority.NoPriority(agents)
-    agents = priority.SwissPriority(agents)
+    agents = priority.SwissPriority(agents, order_optimization)
 
     reach_end_target = []
     for name_agent in agents:

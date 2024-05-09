@@ -65,19 +65,8 @@ class PriorityController:
 
         return agents
 
-    def SwissPriority(self, agents):
+    def SwissPriority(self, agents, order_optimization):
 
-        if self.env_nr == 0:
-            agents = self.env_0_SiwssPriority(agents)
-        elif self.env_nr == 1:
-            agents = self.env_1_SiwssPriority(agents)
-        else:
-            print('Not defined')
-            error()
-
-        return agents
-
-    def env_0_SiwssPriority(self, agents):
         ids_entering = []
         ids_exiting = []
         for id_agent in range(len(agents)):
@@ -86,44 +75,18 @@ class PriorityController:
             elif agents[f'{id_agent}'].exiting:
                 ids_exiting.append(f'{id_agent}')
 
-        # Here is assumed there are no way point between the start and the waypoint before the cross!
         if len(ids_entering) != 0:
-            if len(ids_entering) == 1:
-                priority = [True]
-            if len(ids_entering) > 1:
-                priority = [False] * len(ids_entering)
-                for i, id_agent in enumerate(ids_entering):
-                    priority_i = True
-                    for j, id_other_agent in enumerate(ids_entering):
-                        if id_agent != id_other_agent:
-                            dist_i = np.linalg.norm(agents[id_agent].target[0:2] - agents[id_agent].position)
-                            dist_j = np.linalg.norm(agents[id_other_agent].target[0:2] - agents[id_other_agent].position)
-                            """# If the car is near enough to the target we consider some priorities
-                            if dist_i <= 10:
-                                # If the other car is less than 5m more distant from the target, then we give anyway the priority
-                                if dist_j <= dist_i + 10:
-                                    # If the car is on the right we give the priority
-                                    if theta <= agents[id_agent].target[2]:
-                                        priority_i = False
-                            else: # If the car is far away from the target we consider, have not priority
-                                priority_i = False"""
-                            # If the other car is less than 5m more distant from the target, then we give anyway the priority
-                            if dist_j <= dist_i + 10:
-                                # If the car is on the right we give the priority
-                                if agents[id_agent].target[2] == 0:
-                                    if agents[id_other_agent].target[2] == np.pi/2:
-                                        priority_i = False
-                                elif agents[id_agent].target[2] == np.pi/2:
-                                    if agents[id_other_agent].target[2] == np.pi:
-                                        priority_i = False
-                                elif agents[id_agent].target[2] == np.pi:
-                                    if agents[id_other_agent].target[2] == -np.pi/2:
-                                        priority_i = False
-                                elif agents[id_agent].target[2] == -np.pi/2:
-                                    if agents[id_other_agent].target[2] == 0:
-                                        priority_i = False
-                    if priority_i:
-                        priority[i] = True
+            if self.env_nr == 0:
+                priority = self.env_0_SiwssPriority(agents, ids_entering)
+            elif self.env_nr == 1:
+                priority = self.env_1_SiwssPriority(agents, ids_entering)
+            elif self.env_nr == 2:
+                priority = self.env_2_SiwssPriority(agents, ids_entering)
+            elif self.env_nr == 3:
+                priority = self.env_0_SiwssPriority(agents, ids_entering)
+            else:
+                print('Not defined')
+                error()
 
             if True in priority:
                 id_priority_vehicle = ids_entering[priority.index(True)]
@@ -149,13 +112,16 @@ class PriorityController:
                         agents[id_priority_vehicle].target = agents[id_priority_vehicle].waypoints_exiting.pop(0)
                         agents[id_priority_vehicle].exiting = True
                         agents[id_priority_vehicle].entering = False
-
+                        order_optimization.remove(id_priority_vehicle)
+                        order_optimization.insert(len(ids_exiting), id_priority_vehicle)
                 else:
                     dist_own_target = np.linalg.norm(agents[id_priority_vehicle].position - agents[id_priority_vehicle].target[0:2])
                     if dist_own_target <= 1:
                         agents[id_priority_vehicle].target = agents[id_priority_vehicle].waypoints_exiting.pop(0)
                         agents[id_priority_vehicle].exiting = True
                         agents[id_priority_vehicle].entering = False
+                        order_optimization.remove(id_priority_vehicle)
+                        order_optimization.insert(len(ids_exiting), id_priority_vehicle)
 
         for id_agent in ids_exiting:
             distance_target = np.linalg.norm(agents[id_agent].position - agents[id_agent].target[0:2])
@@ -170,6 +136,115 @@ class PriorityController:
 
         return agents
 
-    def env_1_SiwssPriority(self, agents):
+    def env_0_SiwssPriority(self, agents, ids_entering):
 
-        return agents
+        # Here is assumed there are no way point between the start and the waypoint before the cross!
+        if len(ids_entering) == 1:
+            priority = [True]
+        if len(ids_entering) > 1:
+            priority = [False] * len(ids_entering)
+            for i, id_agent in enumerate(ids_entering):
+                priority_i = True
+                for j, id_other_agent in enumerate(ids_entering):
+                    if id_agent != id_other_agent:
+                        dist_i = np.linalg.norm(agents[id_agent].target[0:2] - agents[id_agent].position)
+                        dist_j = np.linalg.norm(agents[id_other_agent].target[0:2] - agents[id_other_agent].position)
+                        # If the other car is less than 5m more distant from the target, then we give anyway the priority
+                        if dist_i < 10 and dist_j < 10:
+                            # If the car is on the right we give the priority
+                            if agents[id_agent].target[2] == 0:
+                                if agents[id_other_agent].target[2] == np.pi / 2:
+                                    priority_i = False
+                            elif agents[id_agent].target[2] == np.pi / 2:
+                                if agents[id_other_agent].target[2] == np.pi:
+                                    priority_i = False
+                            elif agents[id_agent].target[2] == np.pi:
+                                if agents[id_other_agent].target[2] == -np.pi / 2:
+                                    priority_i = False
+                            elif agents[id_agent].target[2] == -np.pi / 2:
+                                if agents[id_other_agent].target[2] == 0:
+                                    priority_i = False
+                        elif dist_i < 10 and dist_j > 10 and (dist_j - dist_i) < 5:
+                            # If the car is on the right we give the priority
+                            if agents[id_agent].target[2] == 0:
+                                if agents[id_other_agent].target[2] == np.pi/2:
+                                    priority_i = False
+                            elif agents[id_agent].target[2] == np.pi/2:
+                                if agents[id_other_agent].target[2] == np.pi:
+                                    priority_i = False
+                            elif agents[id_agent].target[2] == np.pi:
+                                if agents[id_other_agent].target[2] == -np.pi/2:
+                                    priority_i = False
+                            elif agents[id_agent].target[2] == -np.pi/2:
+                                if agents[id_other_agent].target[2] == 0:
+                                    priority_i = False
+                if priority_i:
+                    priority[i] = True
+
+        return priority
+
+    def env_1_SiwssPriority(self, agents, ids_entering):
+
+        # Here is assumed there are no way point between the start and the waypoint before the cross!
+        if len(ids_entering) == 1:
+            priority = [True]
+        if len(ids_entering) > 1:
+            priority = [False] * len(ids_entering)
+            for i, id_agent in enumerate(ids_entering):
+                priority_i = True
+                for j, id_other_agent in enumerate(ids_entering):
+                    if id_agent != id_other_agent:
+                        dist_i = np.linalg.norm(agents[id_agent].target[0:2] - agents[id_agent].position)
+                        dist_j = np.linalg.norm(agents[id_other_agent].target[0:2] - agents[id_other_agent].position)
+                        # If the other car is less than 5m more distant from the target, then we give anyway the priority
+                        if dist_i < 10 and dist_j < 10:
+                            if agents[id_agent].target[2] == np.pi / 2:
+                                if agents[id_other_agent].target[2] == np.pi or agents[id_other_agent].target[2] == 0:
+                                    priority_i = False
+                            elif agents[id_agent].target[2] == -np.pi / 2:
+                                if agents[id_other_agent].target[2] == np.pi or agents[id_other_agent].target[2] == 0:
+                                    priority_i = False
+                        elif dist_i < 10 and dist_j > 10 and (dist_j - dist_i) < 5:
+                            if agents[id_agent].target[2] == np.pi / 2:
+                                if agents[id_other_agent].target[2] == np.pi or agents[id_other_agent].target[2] == 0:
+                                    priority_i = False
+                            elif agents[id_agent].target[2] == -np.pi / 2:
+                                if agents[id_other_agent].target[2] == np.pi or agents[id_other_agent].target[2] == 0:
+                                    priority_i = False
+                if priority_i:
+                    priority[i] = True
+
+        return priority
+
+    def env_2_SiwssPriority(self, agents, ids_entering):
+
+        # Here is assumed there are no way point between the start and the waypoint before the cross!
+        if len(ids_entering) == 1:
+            priority = [True]
+        if len(ids_entering) > 1:
+            priority = [False] * len(ids_entering)
+            for i, id_agent in enumerate(ids_entering):
+                priority_i = True
+                for j, id_other_agent in enumerate(ids_entering):
+                    if id_agent != id_other_agent:
+                        dist_i = np.linalg.norm(agents[id_agent].target[0:2] - agents[id_agent].position)
+                        dist_j = np.linalg.norm(agents[id_other_agent].target[0:2] - agents[id_other_agent].position)
+                        # If the other car is less than 5m more distant from the target, then we give anyway the priority
+                        if dist_i < 10 and dist_j < 10:
+                            if agents[id_agent].target[2] == 0:
+                                if agents[id_other_agent].target[2] == np.pi / 2 or agents[id_other_agent].target[2] == -np.pi / 2:
+                                    priority_i = False
+                            elif agents[id_agent].target[2] == np.pi:
+                                if agents[id_other_agent].target[2] == np.pi / 2 or agents[id_other_agent].target[2] == -np.pi / 2:
+                                    priority_i = False
+                        elif dist_i < 10 and dist_j > 10 and (dist_j - dist_i) < 5:
+                            if agents[id_agent].target[2] == 0:
+                                if agents[id_other_agent].target[2] == np.pi / 2 or agents[id_other_agent].target[2] == -np.pi / 2:
+                                    priority_i = False
+                            elif agents[id_agent].target[2] == np.pi:
+                                if agents[id_other_agent].target[2] == np.pi / 2 or agents[id_other_agent].target[2] == -np.pi / 2:
+                                    priority_i = False
+                if priority_i:
+                    priority[i] = True
+
+        return priority
