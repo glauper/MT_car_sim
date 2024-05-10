@@ -53,8 +53,18 @@
 		},
 
 	"Vehicle Specification": {
-		"types": ["standard_car"],
+		"types": ["standard_car", "emergency_car"],
 		"standard_car": {
+			"length": 3,
+			"width": 2,
+			"l_f": 1,
+			"l_r": 1,
+			"security distance": 3,
+			"velocity limits": [-3, 33],
+			"acceleration limits": [-3, 3],
+			"steering angle limits": [-60, 60]
+		},
+		"emergency_car": {
 			"length": 3,
 			"width": 2,
 			"l_f": 1,
@@ -75,7 +85,7 @@
 	},
 	"Entrances": {
 		"0": {
-			"position": [-26, -3],
+			"position": [-28, -3],
 			"orientation": 0,
 			"speed limit": 2,
 			"offset": [5, 0],
@@ -84,7 +94,7 @@
 			"position 2": [-10, -3]
 		},
 		"1": {
-			"position": [10, 3],
+			"position": [9, 3],
 			"orientation": 180,
 			"speed limit": 2,
 			"offset": [-5, 0],
@@ -92,7 +102,7 @@
 			"waypoints": [[7, 3]]
 		},
 		"2": {
-			"position": [-3, 26],
+			"position": [-3, 28],
 			"orientation": -90,
 			"speed limit": 2,
 			"offset": [0, -5],

@@ -60,38 +60,12 @@ while run_simulation:
         else:
             agents[name_vehicle].brakes()
 
-    """# Check if any agents have reach a target and change it in case
-    for id_vehicle in range(env['Number Vehicles']):
-        distance_target = np.linalg.norm(agents[f'{id_vehicle}'].position - agents[f'{id_vehicle}'].target[0:2])
-        if agents[f'{id_vehicle}'].waypoints_status != 0 and distance_target <= 1:
-            agents[f'{id_vehicle}'].target = agents[f'{id_vehicle}'].waypoints.pop(0)
-            agents[f'{id_vehicle}'].waypoints_status = len(agents[f'{id_vehicle}'].waypoints)
-
-        elif agents[f'{id_vehicle}'].waypoints_status == 0 and distance_target <= 1:
-            options_entrance = list(env['Entrances'].keys())
-            key_init = random.choice(options_entrance)
-            agents[f'{id_vehicle}'].init_state(env, key_init)
-            flag = True
-            while flag:
-                checks = []
-                for id_other_vehicle in range(env['Number Vehicles']):
-                    if id_vehicle != id_other_vehicle:
-                        dist = np.linalg.norm(agents[f'{id_vehicle}'].position - agents[f'{id_other_vehicle}'].position)
-                        if dist <= max(agents[f'{id_other_vehicle}'].security_dist, agents[f'{id_vehicle}'].security_dist):
-                            checks.append(False)
-                            options_entrance.remove(key_init)
-                            key_init = random.choice(options_entrance)
-                            agents[f'{id_vehicle}'].init_state(env, key_init)
-                            #Change the type of vehicle!
-                        else:
-                            checks.append(True)
-                if all(checks) == True:
-                    flag = False
-                else:
-                    flag = True"""
-
     #agents = priority.NoPriority(agents)
     agents = priority.SwissPriority(agents, order_optimization)
+
+    # update the velocity limit in the new street
+    for name_agent in agents:
+        agents[name_agent].update_velocity_limits(env)
 
     reach_end_target = []
     for name_agent in agents:

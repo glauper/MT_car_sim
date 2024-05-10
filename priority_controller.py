@@ -149,6 +149,9 @@ class PriorityController:
                     if id_agent != id_other_agent:
                         dist_i = np.linalg.norm(agents[id_agent].target[0:2] - agents[id_agent].position)
                         dist_j = np.linalg.norm(agents[id_other_agent].target[0:2] - agents[id_other_agent].position)
+                        print('dist_i', dist_i)
+                        print('dist_j', dist_j)
+                        print('diff', dist_j -dist_i)
                         # If the other car is less than 5m more distant from the target, then we give anyway the priority
                         if dist_i < 10 and dist_j < 10:
                             # If the car is on the right we give the priority
@@ -164,7 +167,7 @@ class PriorityController:
                             elif agents[id_agent].target[2] == -np.pi / 2:
                                 if agents[id_other_agent].target[2] == 0:
                                     priority_i = False
-                        elif dist_i < 10 and dist_j > 10 and (dist_j - dist_i) < 5:
+                        elif dist_i < 10 and dist_j > 10 and abs(dist_j - dist_i) < 5:
                             # If the car is on the right we give the priority
                             if agents[id_agent].target[2] == 0:
                                 if agents[id_other_agent].target[2] == np.pi/2:
@@ -204,7 +207,7 @@ class PriorityController:
                             elif agents[id_agent].target[2] == -np.pi / 2:
                                 if agents[id_other_agent].target[2] == np.pi or agents[id_other_agent].target[2] == 0:
                                     priority_i = False
-                        elif dist_i < 10 and dist_j > 10 and (dist_j - dist_i) < 5:
+                        elif dist_i < 10 and dist_j > 10 and abs(dist_j - dist_i) < 5:
                             if agents[id_agent].target[2] == np.pi / 2:
                                 if agents[id_other_agent].target[2] == np.pi or agents[id_other_agent].target[2] == 0:
                                     priority_i = False
@@ -237,7 +240,7 @@ class PriorityController:
                             elif agents[id_agent].target[2] == np.pi:
                                 if agents[id_other_agent].target[2] == np.pi / 2 or agents[id_other_agent].target[2] == -np.pi / 2:
                                     priority_i = False
-                        elif dist_i < 10 and dist_j > 10 and (dist_j - dist_i) < 5:
+                        elif dist_i < 10 and dist_j > 10 and abs(dist_j - dist_i) < 5:
                             if agents[id_agent].target[2] == 0:
                                 if agents[id_other_agent].target[2] == np.pi / 2 or agents[id_other_agent].target[2] == -np.pi / 2:
                                     priority_i = False

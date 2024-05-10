@@ -47,6 +47,12 @@ class Vehicle:
         self.b_u[2, 0] = self.steering_limits[1] * (np.pi / 180)
         self.b_u[3, 0] = -self.steering_limits[0] * (np.pi / 180)
 
+    def update_velocity_limits(self, env):
+        for exit in env['Exits']:
+            if env['Exits'][exit]['position'][0] == self.target[0] and env['Exits'][exit]['position'][1] == self.target[1]:
+                self.b_x[6, 0] = env['Exits'][exit]['speed limit']
+
+
     def init_state(self, env, key_init):
         if key_init == 'Ego Entrance':
             state = np.zeros((4, 1))
@@ -67,14 +73,14 @@ class Vehicle:
                 point[0, 0] = env['Ego Entrance']['waypoints'][i][0]
                 point[1, 0] = env['Ego Entrance']['waypoints'][i][1]
                 point[2, 0] = env['Ego Entrance']['orientation'] * (np.pi / 180)
-                # point[3, 0] = env['Entrances'][key_init]['speed limit']
+                #point[3, 0] = env['Entrances'][key_init]['speed limit']
                 point[3, 0] = 0
                 self.waypoints_entering.append(point)
         else:
             state = np.zeros((4, 1))
             state[0:2, 0] = env['Entrances'][key_init]['position']
             state[2, 0] = env['Entrances'][key_init]['orientation'] * (np.pi / 180)  # form degrees in radiants
-            state[3, 0] = random.randint(0, env['Entrances'][key_init]['speed limit'])
+            state[3, 0] = random.uniform(0, env['Entrances'][key_init]['speed limit'])
 
             key_target = str(random.choice(env['Entrances'][key_init]['targets']))
             target = np.zeros((4, 1))
@@ -99,8 +105,8 @@ class Vehicle:
             point[0, 0] = env['Exits'][key_target]['waypoints'][i][0]
             point[1, 0] = env['Exits'][key_target]['waypoints'][i][1]
             point[2, 0] = env['Exits'][key_target]['orientation'] * (np.pi / 180)
-            #point[3, 0] = env['Exits'][key_target]['speed limit']
-            point[3, 0] = 0
+            point[3, 0] = env['Exits'][key_target]['speed limit']
+            #point[3, 0] = 0
             self.waypoints_exiting.append(point)
 
         self.waypoints_exiting.append(target)
