@@ -10,10 +10,16 @@ from vehicle import Vehicle
 SimulationParam = SimulationConfig()
 delta_t = SimulationParam['Timestep']
 env, circular_obstacles = EnviromentConfig(SimulationParam['Environment'])
+
 agents = {}
 options_init_state = list(env['Entrances'].keys())
+nr_type_vehicles = len(env['Vehicle Specification']['types'])
+
 for i in range(env['Number Vehicles']):
-    type = env['Vehicle Specification']['types'][0]
+    if  nr_type_vehicles > 1 and i < nr_type_vehicles - 1:
+        type = env['Vehicle Specification']['types'][i+1]
+    else:
+        type = env['Vehicle Specification']['types'][0]
     info_vehicle = env['Vehicle Specification'][type]
     agents[f'{i}'] = Vehicle(type, info_vehicle, delta_t)
     key_init = random.choice(options_init_state)
@@ -21,6 +27,11 @@ for i in range(env['Number Vehicles']):
     agents[f'{i}'].init_system_constraints(env["State space"], env['Entrances'][key_init]['speed limit'])
     options_init_state.remove(key_init)
     agents[f'{i}'].init_trackingMPC(SimulationParam['Controller']['Horizon'])
+
+presence_emergency_car = False
+for name_vehicle in agents:
+    if agents[name_vehicle].type == 'emergency_car':
+        presence_emergency_car = True
 
 type = env['Vehicle Specification']['types'][0]
 info_vehicle = env['Vehicle Specification'][type]
@@ -53,12 +64,20 @@ while run_simulation:
             input[f'agent {id_vehicle}'] = agents[name_vehicle].trackingMPC(other_agents, circular_obstacles, t)
             other_agents[name_vehicle] = agents[name_vehicle]
 
-    # Dynamics propagation
-    for id_vehicle, name_vehicle in enumerate(agents):
-        if agents[name_vehicle].entering or agents[name_vehicle].exiting:
-            agents[name_vehicle].dynamics_propagation(input[f'agent {id_vehicle}'])
-        else:
-            agents[name_vehicle].brakes()
+    if presence_emergency_car:
+        # Dynamics propagation
+        for id_vehicle, name_vehicle in enumerate(agents):
+            if agents[name_vehicle].type == 'emergency_car':
+                agents[name_vehicle].dynamics_propagation(input[f'agent {id_vehicle}'])
+            else:
+                agents[name_vehicle].brakes()
+    else:
+        # Dynamics propagation
+        for id_vehicle, name_vehicle in enumerate(agents):
+            if agents[name_vehicle].entering or agents[name_vehicle].exiting:
+                    agents[name_vehicle].dynamics_propagation(input[f'agent {id_vehicle}'])
+            else:
+                agents[name_vehicle].brakes()
 
     #agents = priority.NoPriority(agents)
     agents = priority.SwissPriority(agents, order_optimization)
@@ -73,6 +92,9 @@ while run_simulation:
             reach_end_target.append(True)
         else:
             reach_end_target.append(False)
+
+        if agents[name_agent].exiting and agents[name_agent].type == 'emergency_car':
+            presence_emergency_car = False
 
     if all(reach_end_target):
         run_simulation = False

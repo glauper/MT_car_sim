@@ -53,18 +53,8 @@
 		},
 
 	"Vehicle Specification": {
-		"types": ["standard_car", "emergency_car"],
+		"types": ["standard_car"],
 		"standard_car": {
-			"length": 3,
-			"width": 2,
-			"l_f": 1,
-			"l_r": 1,
-			"security distance": 3,
-			"velocity limits": [-3, 33],
-			"acceleration limits": [-3, 3],
-			"steering angle limits": [-60, 60]
-		},
-		"emergency_car": {
 			"length": 3,
 			"width": 2,
 			"l_f": 1,

@@ -52,7 +52,6 @@ class Vehicle:
             if env['Exits'][exit]['position'][0] == self.target[0] and env['Exits'][exit]['position'][1] == self.target[1]:
                 self.b_x[6, 0] = env['Exits'][exit]['speed limit']
 
-
     def init_state(self, env, key_init):
         if key_init == 'Ego Entrance':
             state = np.zeros((4, 1))
