@@ -82,7 +82,7 @@ class PriorityController:
                 priority = self.env_1_SiwssPriority(agents, ids_entering)
             elif self.env_nr == 2:
                 priority = self.env_2_SiwssPriority(agents, ids_entering)
-            elif self.env_nr == 3 or self.env_nr == 4:
+            elif self.env_nr == 3 or self.env_nr == 4 or self.env_nr == 5:
                 priority = self.env_0_SiwssPriority(agents, ids_entering)
             else:
                 print('Not defined')

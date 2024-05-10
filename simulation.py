@@ -29,9 +29,16 @@ for i in range(env['Number Vehicles']):
     agents[f'{i}'].init_trackingMPC(SimulationParam['Controller']['Horizon'])
 
 presence_emergency_car = False
+distance = []
 for name_vehicle in agents:
+    distance.append(np.linalg.norm(agents[name_vehicle].position))
     if agents[name_vehicle].type == 'emergency_car':
         presence_emergency_car = True
+
+order_optimization = list(agents.keys())
+pairs = list(zip(order_optimization, distance))
+sorted_pairs = sorted(pairs, key=lambda x: x[1])
+order_optimization = [pair[0] for pair in sorted_pairs]
 
 type = env['Vehicle Specification']['types'][0]
 info_vehicle = env['Vehicle Specification'][type]
@@ -44,7 +51,6 @@ t = 0
 run_simulation = True
 results = results_init(env, agents)
 options_entrance = list(env['Entrances'].keys())
-order_optimization = list(agents.keys())
 
 while run_simulation:
     print("Simulation time: ", t)
