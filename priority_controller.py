@@ -189,18 +189,29 @@ class PriorityController:
                     if id_agent != id_other_agent:
                         dist_i = np.linalg.norm(agents[id_agent].target[0:2] - agents[id_agent].position)
                         dist_j = np.linalg.norm(agents[id_other_agent].target[0:2] - agents[id_other_agent].position)
-                        # If the other car is less than 5m more distant from the target, then we give anyway the priority
+
                         both_near = dist_i < 10 and dist_j < 10
                         i_little_closer_then_j = dist_i < 10 and dist_j > 10 and abs(dist_j - dist_i) < 5
                         j_little_closer_then_i = dist_i > 10 and dist_j < 10 and abs(dist_j - dist_i) < 5
                         j_lot_closer_then_i = dist_i > 10 and dist_j < 10 and abs(dist_j - dist_i) > 5
+                        # If the other car is less than 5m more distant from the target, then we give anyway the priority
                         if both_near or i_little_closer_then_j or j_little_closer_then_i:
-                            if agents[id_agent].target[2] == np.pi / 2:
+                            if agents[id_agent].target[2] == np.pi / 2 or agents[id_agent].target[2] == -np.pi / 2:
                                 if agents[id_other_agent].target[2] == np.pi or agents[id_other_agent].target[2] == 0:
                                     priority_i = False
-                            elif agents[id_agent].target[2] == -np.pi / 2:
+                            elif agents[id_agent].target[2] == np.pi or agents[id_agent].target[2] == 0:
                                 if agents[id_other_agent].target[2] == np.pi or agents[id_other_agent].target[2] == 0:
-                                    priority_i = False
+                                    if (agents[id_agent].waypoints_exiting[0][2] == agents[id_agent].target[2]
+                                            and agents[id_other_agent].waypoints_exiting[0][2] == agents[id_other_agent].target[2]):
+                                        priority_i = True
+                                    elif (agents[id_agent].waypoints_exiting[0][2] != agents[id_agent].target[2]
+                                          and agents[id_other_agent].waypoints_exiting[0][2] == agents[id_other_agent].target[2]):
+                                        priority_i = False
+                                    elif (agents[id_agent].waypoints_exiting[0][2] == agents[id_agent].target[2]
+                                          and agents[id_other_agent].waypoints_exiting[0][2] != agents[id_other_agent].target[2]):
+                                        priority_i = True
+                        elif j_lot_closer_then_i:
+                            priority_i = False
                 if priority_i:
                     priority[i] = True
 
@@ -225,12 +236,25 @@ class PriorityController:
                         j_little_closer_then_i = dist_i > 10 and dist_j < 10 and abs(dist_j - dist_i) < 5
                         j_lot_closer_then_i = dist_i > 10 and dist_j < 10 and abs(dist_j - dist_i) > 5
                         if both_near or i_little_closer_then_j or j_little_closer_then_i:
-                            if agents[id_agent].target[2] == 0:
+                            if agents[id_agent].target[2] == np.pi or agents[id_agent].target[2] == 0:
                                 if agents[id_other_agent].target[2] == np.pi / 2 or agents[id_other_agent].target[2] == -np.pi / 2:
                                     priority_i = False
-                            elif agents[id_agent].target[2] == np.pi:
+                            elif agents[id_agent].target[2] == np.pi / 2 or agents[id_agent].target[2] == -np.pi / 2:
                                 if agents[id_other_agent].target[2] == np.pi / 2 or agents[id_other_agent].target[2] == -np.pi / 2:
-                                    priority_i = False
+                                    if (agents[id_agent].waypoints_exiting[0][2] == agents[id_agent].target[2]
+                                            and agents[id_other_agent].waypoints_exiting[0][2] ==
+                                            agents[id_other_agent].target[2]):
+                                        priority_i = True
+                                    elif (agents[id_agent].waypoints_exiting[0][2] != agents[id_agent].target[2]
+                                          and agents[id_other_agent].waypoints_exiting[0][2] ==
+                                          agents[id_other_agent].target[2]):
+                                        priority_i = False
+                                    elif (agents[id_agent].waypoints_exiting[0][2] == agents[id_agent].target[2]
+                                          and agents[id_other_agent].waypoints_exiting[0][2] !=
+                                          agents[id_other_agent].target[2]):
+                                        priority_i = True
+                        elif j_lot_closer_then_i:
+                            priority_i = False
                 if priority_i:
                     priority[i] = True
 

@@ -1,9 +1,9 @@
 {"env": {
-	"Number Vehicles": 3,
+	"Number Vehicles": 4,
 	"Number Pedestrians": 0,
 	"State space": {
-		"x limits": [-25, 25],
-		"y limits": [-25, 25]
+		"x limits": [-30, 30],
+		"y limits": [-30, 30]
 	},
 	"Priority space": {
 		"x limits": [-8, 8],
@@ -11,45 +11,45 @@
 	},
 	"Road Limits": {
 		"0": {
-			"line x": [-25, -6],
+			"line x": [-30, -6],
 			"line y": [6, 6],
-			"center": [-16, 6],
-			"radius": [10, 0.5]},
+			"center": [-18, 6],
+			"radius": [12, 0.5]},
 		"1": {
 			"line x": [-6, -6],
-			"line y": [6, 25],
-			"center": [-6, 16],
+			"line y": [6, 30],
+			"center": [-6, 18],
 			"radius": [0.5, 10]},
 		"2": {
 			"line x": [6, 6],
-			"line y": [25, 6],
-			"center": [6, 16],
-			"radius": [0.5, 10]},
+			"line y": [30, 6],
+			"center": [6, 18],
+			"radius": [0.5, 12]},
 		"3": {
-			"line x": [6, 25],
+			"line x": [6, 30],
 			"line y": [6, 6],
-			"center": [16, 6],
-			"radius": [10, 0.5]},
+			"center": [18, 6],
+			"radius": [12, 0.5]},
 		"4": {
-			"line x": [6, 25],
+			"line x": [6, 30],
 			"line y": [-6, -6],
-			"center": [16, -6],
-			"radius": [10, 0.5]},
+			"center": [18, -6],
+			"radius": [12, 0.5]},
 		"5": {
 			"line x": [6, 6],
-			"line y": [-6, -25],
-			"center": [6, -16],
-			"radius": [0.5, 10]},
+			"line y": [-6, -30],
+			"center": [6, -18],
+			"radius": [0.5, 12]},
 		"6": {
 			"line x": [-6, -6],
-			"line y": [-6, -25],
-			"center": [-6, -16],
-			"radius": [0.5, 10]},
+			"line y": [-6, -30],
+			"center": [-6, -18],
+			"radius": [0.5, 12]},
 		"7": {
-			"line x": [-6, -25],
+			"line x": [-6, -30],
 			"line y": [-6, -6],
-			"center": [-16, -6],
-			"radius": [10, 0.5]}
+			"center": [-18, -6],
+			"radius": [12, 0.5]}
 		},
 
 	"Vehicle Specification": {
@@ -59,7 +59,7 @@
 			"width": 2,
 			"l_f": 1,
 			"l_r": 1,
-			"security distance": 4,
+			"security distance": 3,
 			"velocity limits": [-3, 33],
 			"acceleration limits": [-3, 3],
 			"steering angle limits": [-60, 60]
@@ -75,7 +75,7 @@
 	},
 	"Entrances": {
 		"0": {
-			"position": [-22, -3],
+			"position": [-18, -3],
 			"orientation": 0,
 			"speed limit": 2.5,
 			"offset": [5, 0],
@@ -83,7 +83,7 @@
 			"waypoints": [[-7, -3]]
 		},
 		"1": {
-			"position": [22, 3],
+			"position": [18, 3],
 			"orientation": 180,
 			"speed limit": 2.5,
 			"offset": [-5, 0],
@@ -91,7 +91,31 @@
 			"waypoints": [[7, 3]]
 		},
 		"2": {
-			"position": [-3, 22],
+			"position": [-3, 18],
+			"orientation": -90,
+			"speed limit": 2,
+			"offset": [0, -5],
+			"targets": [1, 2, 0],
+			"waypoints": [[-3, 7]]
+		},
+		"3": {
+			"position": [-28, -3],
+			"orientation": 0,
+			"speed limit": 2.5,
+			"offset": [5, 0],
+			"targets": [1, 2, 3],
+			"waypoints": [[-7, -3]]
+		},
+		"4": {
+			"position": [28, 3],
+			"orientation": 180,
+			"speed limit": 2.5,
+			"offset": [-5, 0],
+			"targets": [1, 0, 3],
+			"waypoints": [[7, 3]]
+		},
+		"5": {
+			"position": [-3, 28],
 			"orientation": -90,
 			"speed limit": 2,
 			"offset": [0, -5],
@@ -101,28 +125,28 @@
 	},
 	"Exits": {
 		"0": {
-			"position": [-18, 3],
+			"position": [-28, 3],
 			"orientation": 180,
 			"speed limit": 2.5,
-			"waypoints": [[-6, 3]]
+			"waypoints": [[-6, 3], [-15, 3]]
 		},
 		"1": {
-			"position": [-3, -18],
+			"position": [-3, -28],
 			"orientation": -90,
 			"speed limit": 2,
-			"waypoints": [[-3, -6]]
+			"waypoints": [[-3, -6], [-3, -15]]
 		},
 		"2": {
-			"position": [18, -3],
+			"position": [28, -3],
 			"orientation": 0,
 			"speed limit": 2,
-			"waypoints": [[6, -3]]
+			"waypoints": [[6, -3], [15, -3]]
 		},
 		"3": {
-			"position": [3, 18],
+			"position": [3, 28],
 			"orientation": 90,
 			"speed limit": 2.5,
-			"waypoints": [[3, 6]]
+			"waypoints": [[3, 6], [3, 15]]
 		}
 	}
 	}

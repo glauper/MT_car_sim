@@ -1,5 +1,5 @@
 {"env": {
-	"Number Vehicles": 3,
+	"Number Vehicles": 4,
 	"Number Pedestrians": 0,
 	"State space": {
 		"x limits": [-30, 30],
@@ -84,7 +84,7 @@
 			"position 2": [-10, -3]
 		},
 		"1": {
-			"position": [9, 3],
+			"position": [28, 3],
 			"orientation": 180,
 			"speed limit": 2,
 			"offset": [-5, 0],
@@ -93,6 +93,31 @@
 		},
 		"2": {
 			"position": [-3, 28],
+			"orientation": -90,
+			"speed limit": 2,
+			"offset": [0, -5],
+			"targets": [1, 2, 0],
+			"waypoints": [[-3, 7]]
+		},
+		"3": {
+			"position": [-15, -3],
+			"orientation": 0,
+			"speed limit": 2,
+			"offset": [5, 0],
+			"targets": [1, 2, 3],
+			"waypoints": [[-7, -3]],
+			"position 2": [-10, -3]
+		},
+		"4": {
+			"position": [15, 3],
+			"orientation": 180,
+			"speed limit": 2,
+			"offset": [-5, 0],
+			"targets": [1, 0, 3],
+			"waypoints": [[7, 3]]
+		},
+		"5": {
+			"position": [-3, 15],
 			"orientation": -90,
 			"speed limit": 2,
 			"offset": [0, -5],
