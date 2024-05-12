@@ -6,8 +6,8 @@
 		"y limits": [-25, 25]
 	},
 	"Priority space": {
-		"x limits": [-8, 8],
-		"y limits": [-8, 8]
+		"x limits": [-6, 6],
+		"y limits": [-6, 6]
 	},
 	"Road Limits": {
 		"0": {
@@ -84,7 +84,7 @@
 			"orientation": 0,
 			"speed limit": 2,
 			"offset": [5, 0],
-			"targets": [1, 2, 3],
+			"targets": [0, 1, 2, 3],
 			"waypoints": [[-7, -3]]
 		},
 		"1": {
@@ -92,7 +92,7 @@
 			"orientation": 180,
 			"speed limit": 2,
 			"offset": [-5, 0],
-			"targets": [1, 0, 3],
+			"targets": [2, 1, 0, 3],
 			"waypoints": [[7, 3]]
 		},
 		"2": {
@@ -100,7 +100,7 @@
 			"orientation": -90,
 			"speed limit": 2,
 			"offset": [0, -5],
-			"targets": [1, 2, 0],
+			"targets": [3, 1, 2, 0],
 			"waypoints": [[-3, 7]]
 		}
 	},

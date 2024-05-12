@@ -82,8 +82,10 @@ class PriorityController:
                 priority = self.env_1_SiwssPriority(agents, ids_entering)
             elif self.env_nr == 2:
                 priority = self.env_2_SiwssPriority(agents, ids_entering)
-            elif self.env_nr == 3 or self.env_nr == 4 or self.env_nr == 5:
+            elif self.env_nr == 3 or self.env_nr == 4:
                 priority = self.env_0_SiwssPriority(agents, ids_entering)
+            elif self.env_nr == 5:
+                priority = self.env_5_SiwssPriority(agents, ids_entering)
             else:
                 print('Not defined')
                 error()
@@ -260,6 +262,43 @@ class PriorityController:
                                         priority_i = True
                         elif j_lot_closer_then_i:
                             priority_i = False
+                if priority_i:
+                    priority[i] = True
+
+        return priority
+
+    def env_5_SiwssPriority(self, agents, ids_entering):
+
+        # Here is assumed there are no way point between the start and the waypoint before the cross!
+        if len(ids_entering) == 1:
+            priority = [True]
+        if len(ids_entering) > 1:
+            priority = [False] * len(ids_entering)
+            for i, id_agent in enumerate(ids_entering):
+                priority_i = True
+                for j, id_other_agent in enumerate(ids_entering):
+                    if id_agent != id_other_agent:
+                        dist_i = np.linalg.norm(agents[id_agent].target[0:2] - agents[id_agent].position)
+                        #dist_j = np.linalg.norm(agents[id_other_agent].target[0:2] - agents[id_other_agent].position)
+                        # If the other car is less than 5m more distant from the target, then we give anyway the priority
+                        #both_near = dist_i < 2 and dist_j < 10
+                        #i_little_closer_then_j = dist_i < 10 and dist_j > 10 and abs(dist_j - dist_i) < 5
+                        #j_little_closer_then_i = dist_i > 10 and dist_j < 10 and abs(dist_j - dist_i) < 5
+                        #j_lot_closer_then_i = dist_i > 10 and dist_j < 10 and abs(dist_j - dist_i) > 5
+                        if dist_i < 2 and all(self.A_p @ agents[id_other_agent].position <= self.b_p):
+                            # If the car is on the right we give the priority
+                            if agents[id_agent].target[2] == 0:
+                                if agents[id_other_agent].x <= 0 and agents[id_other_agent].y >= 0:
+                                    priority_i = False
+                            elif agents[id_agent].target[2] == np.pi / 2:
+                                if agents[id_other_agent].x <= 0 and agents[id_other_agent].y <= 0:
+                                    priority_i = False
+                            elif agents[id_agent].target[2] == np.pi:
+                                if agents[id_other_agent].x >= 0 and agents[id_other_agent].y <= 0:
+                                    priority_i = False
+                            elif agents[id_agent].target[2] == -np.pi / 2:
+                                if agents[id_other_agent].x >= 0 and agents[id_other_agent].y >= 0:
+                                    priority_i = False
                 if priority_i:
                     priority[i] = True
 

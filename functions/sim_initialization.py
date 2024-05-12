@@ -4,36 +4,118 @@ import os
 import json
 from vehicle import Vehicle
 
-def vehicle_init(vehicles, env):
-
+def agents_init(env, delta_t, SimulationParam):
+    agents = {}
     options_init_state = list(env['Entrances'].keys())
+    nr_type_vehicles = len(env['Vehicle Specification']['types'])
+
     for i in range(env['Number Vehicles']):
+        # put a vehicle for each type different from emergency_car
+        if nr_type_vehicles > 1 and i < nr_type_vehicles - 1:
+            type = env['Vehicle Specification']['types'][i + 1]
+        else:
+            type = env['Vehicle Specification']['types'][0]
+        info_vehicle = env['Vehicle Specification'][type]
+        agents[f'{i}'] = Vehicle(type, info_vehicle, delta_t)
         key_init = random.choice(options_init_state)
+        agents[f'{i}'].init_state(env, key_init)
+        agents[f'{i}'].init_system_constraints(env["State space"], env['Entrances'][key_init]['speed limit'])
         options_init_state.remove(key_init)
-        state = np.zeros((4, 1))
-        state[0:2, 0] = env['Entrances'][key_init]['position']
-        state[0:2, 0] = env['Entrances'][key_init]['position']
-        state[2, 0] = env['Entrances'][key_init]['orientation'] * (np.pi / 180)  # form degrees in radiants
-        state[3, 0] = random.randint(0, env['Entrances'][key_init]['speed limit'])
+        agents[f'{i}'].init_trackingMPC(SimulationParam['Controller']['Horizon'])
+        if SimulationParam['Environment'] == 5:
+            agents[f'{i}'] = env_5_init(agents[f'{i}'])
+            """same_angle = agents[f'{i}'].theta
+            shift_angle_90 = agents[f'{i}'].theta + np.pi / 2
+            if shift_angle_90 > np.pi:
+                shift_angle_90 = shift_angle_90 - 2 * np.pi
+            shift_angle_180 = agents[f'{i}'].theta + np.pi
+            if shift_angle_180 > np.pi:
+                shift_angle_180 = shift_angle_180 - 2 * np.pi
+            target_angle = agents[f'{i}'].waypoints_exiting[-1][2]
+            if same_angle == target_angle or shift_angle_90 == target_angle or shift_angle_180 == target_angle:
+                new = np.zeros((4, 1))
+                if agents[f'{i}'].theta == 0:
+                    new[0] = 3
+                    new[1] = -3
+                elif agents[f'{i}'].theta == np.pi / 2:
+                    new[0] = 3
+                    new[1] = 3
+                elif agents[f'{i}'].theta == np.pi:
+                    new[0] = -3
+                    new[1] = 3
+                elif agents[f'{i}'].theta == -np.pi / 2:
+                    new[0] = -3
+                    new[1] = -3
+                new[2] = agents[f'{i}'].theta
+                new[3] = 0
+                agents[f'{i}'].waypoints_exiting.insert(0, new)
+            if shift_angle_180 == target_angle:
+                new = np.zeros((4, 1))
+                if agents[f'{i}'].theta == 0:
+                    new[0] = 3
+                    new[1] = 3
+                elif agents[f'{i}'].theta == np.pi / 2:
+                    new[0] = -3
+                    new[1] = 3
+                elif agents[f'{i}'].theta == np.pi:
+                    new[0] = -3
+                    new[1] = -3
+                elif agents[f'{i}'].theta == -np.pi / 2:
+                    new[0] = 3
+                    new[1] = -3
+                new[2] = agents[f'{i}'].waypoints_exiting[-1][2]
+                new[3] = 0
+                agents[f'{i}'].waypoints_exiting.insert(1, new)"""
 
-        key_target = str(random.choice(env['Entrances'][key_init]['targets']))
-        target = np.zeros((4, 1))
-        target[0:2, 0] = env['Exits'][key_target]['position']
-        target[2, 0] = env['Exits'][key_target]['orientation'] * (np.pi / 180)  # form degrees in radiants
-        target[3, 0] = 0
+    return agents
 
-        # questo dipende troppo da un specifico enviroments!
-        if np.linalg.norm(target[0:2, 0] - state[0:2, 0]) <= 4:
-            while np.linalg.norm(target[0:2, 0] - state[0:2, 0]) <= 4:
-                key_target = random.choice(list(env['Exits'].keys()))
-                target[0:2, 0] = env['Exits'][key_target]['position']
-                target[2, 0] = env['Exits'][key_target]['orientation'] * (np.pi / 180)  # form degrees in radiants
-                target[3, 0] = random.randint(0, env['Exits'][key_target]['speed limit'])
+def env_5_init(agent):
+    same_angle = agent.theta
+    shift_angle_90 = agent.theta + np.pi / 2
+    if shift_angle_90 > np.pi:
+        shift_angle_90 = shift_angle_90 - 2 * np.pi
+    shift_angle_180 = agent.theta + np.pi
+    if shift_angle_180 > np.pi:
+        shift_angle_180 = shift_angle_180 - 2 * np.pi
+    target_angle = agent.waypoints_exiting[-1][2]
+    if same_angle == target_angle or shift_angle_90 == target_angle or shift_angle_180 == target_angle:
+        new = np.zeros((4, 1))
+        if agent.theta == 0:
+            new[0] = 3
+            new[1] = -3
+        elif agent.theta == np.pi / 2:
+            new[0] = 3
+            new[1] = 3
+        elif agent.theta == np.pi:
+            new[0] = -3
+            new[1] = 3
+        elif agent.theta == -np.pi / 2:
+            new[0] = -3
+            new[1] = -3
+        new[2] = agent.theta
+        new[3] = 0
+        agent.waypoints_exiting.insert(0, new)
+    if shift_angle_180 == target_angle:
+        new = np.zeros((4, 1))
+        if agent.theta == 0:
+            new[0] = 3
+            new[1] = 3
+        elif agent.theta == np.pi / 2:
+            new[0] = -3
+            new[1] = 3
+        elif agent.theta == np.pi:
+            new[0] = -3
+            new[1] = -3
+        elif agent.theta == -np.pi / 2:
+            new[0] = 3
+            new[1] = -3
+        new[2] = agent.theta + np.pi / 2
+        if new[2] > np.pi:
+            new[2] = new[2] - 2 * np.pi
+        new[3] = 0
+        agent.waypoints_exiting.insert(1, new)
 
-        vehicles[f'{i}'].init_state(state, target)
-        vehicles[f'{i}'].init_system_constraints(env["State space"], env['Entrances'][key_init]['speed limit'])
-
-    return vehicles
+    return agent
 
 def results_init(env, agents):
     results = {}
@@ -76,4 +158,10 @@ def results_update_and_save(env, agent, id_agent, results, env_nr):
         json.dump(env, file)
 
     return results
+
+def normalize_angle(angle):
+    normalized_angle = (angle + np.pi) % (2 * np.pi)
+    if normalized_angle > np.pi:
+        normalized_angle -= 2 * np.pi
+    return normalized_angle
 

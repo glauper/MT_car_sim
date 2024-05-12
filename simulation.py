@@ -2,7 +2,7 @@ import numpy as np
 import random
 from config.config import SimulationConfig, EnviromentConfig
 from functions.plot_functions import plot_simulation
-from functions.sim_initialization import results_init, results_update_and_save
+from functions.sim_initialization import results_init, results_update_and_save, agents_init
 from env_controller import EnvController
 from priority_controller import PriorityController
 from vehicle import Vehicle
@@ -11,7 +11,9 @@ SimulationParam = SimulationConfig()
 delta_t = SimulationParam['Timestep']
 env, circular_obstacles = EnviromentConfig(SimulationParam['Environment'])
 
-agents = {}
+agents = agents_init(env, delta_t, SimulationParam)
+
+"""agents = {}
 options_init_state = list(env['Entrances'].keys())
 nr_type_vehicles = len(env['Vehicle Specification']['types'])
 
@@ -28,6 +30,49 @@ for i in range(env['Number Vehicles']):
     agents[f'{i}'].init_system_constraints(env["State space"], env['Entrances'][key_init]['speed limit'])
     options_init_state.remove(key_init)
     agents[f'{i}'].init_trackingMPC(SimulationParam['Controller']['Horizon'])
+    if SimulationParam['Environment'] == 5:
+        same_angle = agents[f'{i}'].theta
+        shift_angle_90 = agents[f'{i}'].theta + np.pi/2
+        if shift_angle_90 > np.pi:
+            shift_angle_90 = shift_angle_90 - 2*np.pi
+        shift_angle_180 = agents[f'{i}'].theta + np.pi
+        if shift_angle_180 > np.pi:
+            shift_angle_180 = shift_angle_180 - 2*np.pi
+        target_angle = agents[f'{i}'].waypoints_exiting[-1][2]
+        if same_angle == target_angle or shift_angle_90 == target_angle or shift_angle_180 == target_angle:
+            new = np.zeros((4,1))
+            if agents[f'{i}'].theta == 0:
+                new[0] = -3
+                new[1] = -3
+            elif agents[f'{i}'].theta == np.pi / 2:
+                new[0] = 3
+                new[1] = 3
+            elif agents[f'{i}'].theta == np.pi:
+                new[0] = -3
+                new[1] = 3
+            elif agents[f'{i}'].theta == -np.pi / 2:
+                new[0] = -3
+                new[1] = -3
+            new[2] = agents[f'{i}'].theta
+            new[3] = 0
+            agents[f'{i}'].waypoints_exiting.insert(0, new)
+        if shift_angle_180 == target_angle:
+            new = np.zeros((4, 1))
+            if agents[f'{i}'].theta == 0:
+                new[0] = 3
+                new[1] = 3
+            elif agents[f'{i}'].theta == np.pi / 2:
+                new[0] = -3
+                new[1] = 3
+            elif agents[f'{i}'].theta == np.pi:
+                new[0] = -3
+                new[1] = -3
+            elif agents[f'{i}'].theta == -np.pi / 2:
+                new[0] = 3
+                new[1] = -3
+            new[2] = agents[f'{i}'].waypoints_exiting[-1][2]
+            new[3] = 0
+            agents[f'{i}'].waypoints_exiting.insert(1, new)"""
 
 presence_emergency_car = False
 distance = []
