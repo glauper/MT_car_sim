@@ -7,7 +7,7 @@ def SimulationConfig():
     SimulationParam = {'Save middle results': True,
                        'With ChatGPT': False,
                        'Timestep': 0.5, # [s]
-                       'Environment': 2,
+                       'Environment': 5,
                        'Controller': {
                            'Type': "safety filter",
                            # 'Type': "multitrajectory MPC",
@@ -28,9 +28,15 @@ def EnviromentConfig(environment_type):
         circular_obstacles[id] = {'center': [], 'M': []}
         circular_obstacles[id]['center'] = np.array(env['Road Limits'][id]['center']).reshape((2,1))
         circular_obstacles[id]['M'] = np.zeros((2,2))
-        circular_obstacles[id]['M'][0,0] = 1/env['Road Limits'][id]['radius'][0]**2
-        circular_obstacles[id]['M'][1,1] = 1/env['Road Limits'][id]['radius'][1]**2
-        circular_obstacles[id]['r_x'] = env['Road Limits'][id]['radius'][0]
-        circular_obstacles[id]['r_y'] = env['Road Limits'][id]['radius'][1]
+        if len(env['Road Limits'][id]['radius']) == 2:
+            circular_obstacles[id]['M'][0,0] = 1/env['Road Limits'][id]['radius'][0]**2
+            circular_obstacles[id]['M'][1,1] = 1/env['Road Limits'][id]['radius'][1]**2
+            circular_obstacles[id]['r_x'] = env['Road Limits'][id]['radius'][0]
+            circular_obstacles[id]['r_y'] = env['Road Limits'][id]['radius'][1]
+        elif len(env['Road Limits'][id]['radius']) == 1:
+            circular_obstacles[id]['M'][0, 0] = 1 / env['Road Limits'][id]['radius'][0] ** 2
+            circular_obstacles[id]['M'][1, 1] = 1 / env['Road Limits'][id]['radius'][0] ** 2
+            circular_obstacles[id]['r_x'] = env['Road Limits'][id]['radius'][0]
+            circular_obstacles[id]['r_y'] = env['Road Limits'][id]['radius'][0]
 
     return env, circular_obstacles

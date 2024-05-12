@@ -16,6 +16,7 @@ options_init_state = list(env['Entrances'].keys())
 nr_type_vehicles = len(env['Vehicle Specification']['types'])
 
 for i in range(env['Number Vehicles']):
+    # put a vehicle for each type different from emergency_car
     if  nr_type_vehicles > 1 and i < nr_type_vehicles - 1:
         type = env['Vehicle Specification']['types'][i+1]
     else:
@@ -31,14 +32,20 @@ for i in range(env['Number Vehicles']):
 presence_emergency_car = False
 distance = []
 for name_vehicle in agents:
-    distance.append(np.linalg.norm(agents[name_vehicle].position))
     if agents[name_vehicle].type == 'emergency_car':
         presence_emergency_car = True
+        name_emergency_car = name_vehicle
+    else:
+        distance.append(np.linalg.norm(agents[name_vehicle].position))
 
 order_optimization = list(agents.keys())
+if presence_emergency_car:
+    order_optimization.remove(name_emergency_car)
 pairs = list(zip(order_optimization, distance))
 sorted_pairs = sorted(pairs, key=lambda x: x[1])
 order_optimization = [pair[0] for pair in sorted_pairs]
+if presence_emergency_car:
+    order_optimization.insert(0, name_emergency_car)
 
 type = env['Vehicle Specification']['types'][0]
 info_vehicle = env['Vehicle Specification'][type]

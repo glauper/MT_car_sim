@@ -97,16 +97,21 @@ class PriorityController:
                 if len(ids_exiting) >= 1:
                     check_traffic = True
                     for id_other_agent in ids_exiting:
+                        dist_agent_to_agent = np.linalg.norm(agents[id_priority_vehicle].position - agents[id_other_agent].position)
+                        dist_agent_to_target = np.linalg.norm(agents[id_other_agent].position - agents[id_other_agent].target[0:2])
+                        dist_own_target = np.linalg.norm(agents[id_priority_vehicle].position - agents[id_priority_vehicle].target[0:2])
                         if all(self.A_p @ agents[id_other_agent].position <= self.b_p):
-                            dist_agent_to_agent = np.linalg.norm(agents[id_priority_vehicle].position - agents[id_other_agent].position)
-                            dist_agent_to_target = np.linalg.norm(agents[id_other_agent].position - agents[id_other_agent].target[0:2])
-                            dist_own_target = np.linalg.norm(agents[id_priority_vehicle].position - agents[id_priority_vehicle].target[0:2])
                             if dist_agent_to_agent <= max(agents[id_priority_vehicle].security_dist, agents[id_other_agent].security_dist) + 0.5:
                                 check_traffic = False
                             elif dist_agent_to_target >= 4:
                                 check_traffic = False
                             elif dist_own_target >= 1:
                                 check_traffic = False
+                        else:
+                            dist_own_target = np.linalg.norm(agents[id_priority_vehicle].position - agents[id_priority_vehicle].target[0:2])
+                            if dist_own_target >= 1:
+                                check_traffic = False
+
 
                     if check_traffic:
                         agents[id_priority_vehicle].target = agents[id_priority_vehicle].waypoints_exiting.pop(0)

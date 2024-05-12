@@ -416,23 +416,27 @@ def plot_simulation_env_5(env, results):
     fig, ax = plt.subplots()
     obstacles = env['Road Limits']
     for id in obstacles:
-        """if obstacles[id]['radius'][0] != obstacles[id]['radius'][1]:
+        """if len(obstacles[id]['radius']) > 1:
             ellipse = patches.Ellipse((obstacles[id]['center'][0], obstacles[id]['center'][1]), (obstacles[id]['radius'][0]) * 2, (obstacles[id]['radius'][1]) * 2, edgecolor='black', linestyle='--', linewidth=1, facecolor='none')
             ax.add_patch(ellipse)
             ax.set_aspect('equal')
-        elif obstacles[id]['radius'][0] == obstacles[id]['radius'][1]:
+        elif len(obstacles[id]['radius']) == 1:
             circle = patches.Circle((obstacles[id]['center'][0], obstacles[id]['center'][1]),
                                       obstacles[id]['radius'][0], edgecolor='black',
-                                      facecolor='black')
+                                      facecolor='black')"""
+        if len(obstacles[id]['radius']) == 1:
+            circle = patches.Circle((obstacles[id]['center'][0], obstacles[id]['center'][1]),
+                                    obstacles[id]['radius'][0], edgecolor='black',
+                                    facecolor='black')
             ax.set_aspect('equal')
-            ax.add_patch(circle)"""
+            ax.add_patch(circle)
         ax.set_aspect('equal')
         plt.plot(obstacles[id]['line x'], obstacles[id]['line y'], color='black')
 
-    plt.plot([-30, -6], [0, 0], color='black', linestyle='--')
-    plt.plot([30, 6], [0, 0], color='black', linestyle='--')
-    plt.plot([0, 0], [-30, -6], color='black', linestyle='--')
-    plt.plot([0, 0], [30, 6], color='black', linestyle='--')
+    plt.plot([-25, -6], [0, 0], color='black', linestyle='--')
+    plt.plot([25, 6], [0, 0], color='black', linestyle='--')
+    plt.plot([0, 0], [-25, -6], color='black', linestyle='--')
+    plt.plot([0, 0], [25, 6], color='black', linestyle='--')
 
     for id in env['Entrances']:
         plt.scatter(env['Entrances'][id]['position'][0], env['Entrances'][id]['position'][1], color='magenta')
