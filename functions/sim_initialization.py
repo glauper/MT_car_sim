@@ -24,48 +24,6 @@ def agents_init(env, delta_t, SimulationParam):
         agents[f'{i}'].init_trackingMPC(SimulationParam['Controller']['Horizon'])
         if SimulationParam['Environment'] == 5:
             agents[f'{i}'] = env_5_init(agents[f'{i}'])
-            """same_angle = agents[f'{i}'].theta
-            shift_angle_90 = agents[f'{i}'].theta + np.pi / 2
-            if shift_angle_90 > np.pi:
-                shift_angle_90 = shift_angle_90 - 2 * np.pi
-            shift_angle_180 = agents[f'{i}'].theta + np.pi
-            if shift_angle_180 > np.pi:
-                shift_angle_180 = shift_angle_180 - 2 * np.pi
-            target_angle = agents[f'{i}'].waypoints_exiting[-1][2]
-            if same_angle == target_angle or shift_angle_90 == target_angle or shift_angle_180 == target_angle:
-                new = np.zeros((4, 1))
-                if agents[f'{i}'].theta == 0:
-                    new[0] = 3
-                    new[1] = -3
-                elif agents[f'{i}'].theta == np.pi / 2:
-                    new[0] = 3
-                    new[1] = 3
-                elif agents[f'{i}'].theta == np.pi:
-                    new[0] = -3
-                    new[1] = 3
-                elif agents[f'{i}'].theta == -np.pi / 2:
-                    new[0] = -3
-                    new[1] = -3
-                new[2] = agents[f'{i}'].theta
-                new[3] = 0
-                agents[f'{i}'].waypoints_exiting.insert(0, new)
-            if shift_angle_180 == target_angle:
-                new = np.zeros((4, 1))
-                if agents[f'{i}'].theta == 0:
-                    new[0] = 3
-                    new[1] = 3
-                elif agents[f'{i}'].theta == np.pi / 2:
-                    new[0] = -3
-                    new[1] = 3
-                elif agents[f'{i}'].theta == np.pi:
-                    new[0] = -3
-                    new[1] = -3
-                elif agents[f'{i}'].theta == -np.pi / 2:
-                    new[0] = 3
-                    new[1] = -3
-                new[2] = agents[f'{i}'].waypoints_exiting[-1][2]
-                new[3] = 0
-                agents[f'{i}'].waypoints_exiting.insert(1, new)"""
 
     return agents
 
@@ -141,14 +99,12 @@ def results_init(env, agents):
 
     return results
 
-def results_update_and_save(env, agent, id_agent, results, env_nr):
+def results_update_and_save(env, agent, id_agent, results):
 
     results[f'agent {id_agent}']['x coord'].append(float(agent.x))
     results[f'agent {id_agent}']['y coord'].append(float(agent.y))
     results[f'agent {id_agent}']['velocity'].append(float(agent.velocity))
     results[f'agent {id_agent}']['theta'].append(float(agent.theta))
-
-    env['env number'] = env_nr
 
     results_path = os.path.join(os.path.dirname(__file__), ".","../save_results/results.txt")
     env_path = os.path.join(os.path.dirname(__file__), ".", "../save_results/env.txt")
@@ -164,4 +120,27 @@ def normalize_angle(angle):
     if normalized_angle > np.pi:
         normalized_angle -= 2 * np.pi
     return normalized_angle
+
+def collect_info_for_prompts(env, agents, ego):
+    info = []
+    if env['env number'] == 0:
+        info.append(str(ego.velocity[0]))
+        info.append(str(env['Ego Entrance']['speed limit']))
+        info.append(str(np.linalg.norm(ego.position - ego.entry[0:2])))
+        for id_agent in agents:
+            info.append(str(id_agent))
+            info.append(agents[id_agent].type)
+            if agents[id_agent].entering:
+                if agents[id_agent].target[2] == 0:
+                    info.append('coming from your left')
+                elif agents[id_agent].target[2] == np.pi:
+                    info.append('coming from your right')
+                elif agents[id_agent].target[2] == -np.pi/2:
+                    info.append('coming from the opposite direction to you in his lane ')
+            else:
+                info.append('already moving in the cross')
+            info.append(str(np.linalg.norm(ego.position - agents[id_agent].position)))
+            info.append(str(agents[id_agent].velocity[0]))
+
+    return info
 

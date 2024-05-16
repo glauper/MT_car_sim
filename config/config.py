@@ -7,7 +7,8 @@ def SimulationConfig():
     SimulationParam = {'Save middle results': True,
                        'With ChatGPT': False,
                        'Timestep': 0.5, # [s]
-                       'Environment': 1,
+                       'Environment': 0,
+                       'Query': 'go right',
                        'Controller': {
                            'Type': "safety filter",
                            # 'Type': "multitrajectory MPC",

@@ -1,5 +1,0 @@
-{
-		"objective": "ca.norm_2(x - package_3['position'])**2",
-    		"equality_constraints": [],
-    		"inequality_constraints": []
-}

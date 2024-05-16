@@ -1,7 +1,0 @@
-{
-"tasks": [
-"car_1: wait. car_2: wait. car_3: go to West.",
-"car_1: wait. car_2: go to South. car_3: go away",
-"car_1: go to North. car_2: go away. car_3: go away"
-]
-}

@@ -1,1 +1,0 @@
-{"tasks": ["wait car_1 pass", "go straight", "go away"]}

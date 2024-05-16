@@ -119,16 +119,20 @@ class PriorityController:
                         agents[id_priority_vehicle].target = agents[id_priority_vehicle].waypoints_exiting.pop(0)
                         agents[id_priority_vehicle].exiting = True
                         agents[id_priority_vehicle].entering = False
-                        order_optimization.remove(id_priority_vehicle)
-                        order_optimization.insert(len(ids_exiting), id_priority_vehicle)
+                        if id_priority_vehicle != str(len(agents)-1):
+                            print(id_priority_vehicle)
+                            print(str(len(agents)))
+                            order_optimization.remove(id_priority_vehicle)
+                            order_optimization.insert(len(ids_exiting), id_priority_vehicle)
                 else:
                     dist_own_target = np.linalg.norm(agents[id_priority_vehicle].position - agents[id_priority_vehicle].target[0:2])
                     if dist_own_target <= 1:
                         agents[id_priority_vehicle].target = agents[id_priority_vehicle].waypoints_exiting.pop(0)
                         agents[id_priority_vehicle].exiting = True
                         agents[id_priority_vehicle].entering = False
-                        order_optimization.remove(id_priority_vehicle)
-                        order_optimization.insert(len(ids_exiting), id_priority_vehicle)
+                        if id_priority_vehicle != str(len(agents)-1):
+                            order_optimization.remove(id_priority_vehicle)
+                            order_optimization.insert(len(ids_exiting), id_priority_vehicle)
 
         for id_agent in ids_exiting:
             distance_target = np.linalg.norm(agents[id_agent].position - agents[id_agent].target[0:2])

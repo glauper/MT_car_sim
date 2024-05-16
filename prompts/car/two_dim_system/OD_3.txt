@@ -1,5 +1,0 @@
-{
-    		"objective": "ca.norm_2(x['car_0'] - (straight['position'] + np.array([[0],[40]])))**2",
-    		"equality_constraints": [],
-    		"inequality_constraints": []
-}

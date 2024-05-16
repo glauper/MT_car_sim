@@ -52,51 +52,97 @@ class Vehicle:
             if env['Exits'][exit]['position'][0] == self.target[0] and env['Exits'][exit]['position'][1] == self.target[1]:
                 self.b_x[6, 0] = env['Exits'][exit]['speed limit']
 
+    def init_state_for_LLM(self, env, query, N):
+
+        self.N = N
+        self.previous_opt_sol_LLM = {}
+        self.previous_opt_sol_SF = {}
+
+        state = np.zeros((4, 1))
+        state[0:2, 0] = env['Ego Entrance']['position']
+        state[2, 0] = env['Ego Entrance']['orientation'] * (np.pi / 180)  # form degrees in radiants
+        state[3, 0] = random.uniform(0, env['Ego Entrance']['speed limit'])
+
+        if query == 'go right':
+            key_target = '2'
+        elif query == 'go left':
+            key_target = '0'
+        elif query == 'go straight':
+            key_target = '3'
+
+        target = np.zeros((4, 1))
+        target[0:2, 0] = env['Exits'][key_target]['position']
+        target[2, 0] = env['Exits'][key_target]['orientation'] * (np.pi / 180)  # form degrees in radiants
+        target[3, 0] = 0
+
+        self.waypoints_entering = []
+        for i in range(len(env['Ego Entrance']['waypoints'])):
+            point = np.zeros((4, 1))
+            point[0, 0] = env['Ego Entrance']['waypoints'][i][0]
+            point[1, 0] = env['Ego Entrance']['waypoints'][i][1]
+            point[2, 0] = env['Ego Entrance']['orientation'] * (np.pi / 180)
+            # point[3, 0] = env['Entrances'][key_init]['speed limit']
+            point[3, 0] = 0
+            self.waypoints_entering.append(point)
+
+        self.waypoints_exiting = []
+        for i in range(len(env['Exits'][key_target]['waypoints'])):
+            point = np.zeros((4, 1))
+            point[0, 0] = env['Exits'][key_target]['waypoints'][i][0]
+            point[1, 0] = env['Exits'][key_target]['waypoints'][i][1]
+            point[2, 0] = env['Exits'][key_target]['orientation'] * (np.pi / 180)
+            #point[3, 0] = env['Exits'][key_target]['speed limit']
+            point[3, 0] = 0
+            self.waypoints_exiting.append(point)
+
+        self.waypoints_exiting.append(target)
+
+        self.target = self.waypoints_entering.pop(0)
+        self.state = state
+        self.x = state[0]
+        self.y = state[1]
+        self.position = np.array([self.x, self.y]).reshape(2, 1)
+        self.theta = state[2]
+        self.velocity = state[3]
+        self.entering = True
+        self.exiting = False
+
+        # Additional variables needed if you want to use the LLM with the car
+        self.t_subtask = 0
+
+        if query == 'go right':
+            self.right = self.waypoints_exiting[0]
+        elif query == 'go left':
+            self.left = self.waypoints_exiting[0]
+        elif query == 'go straight':
+            self.straight = self.waypoints_exiting[0]
+
+        self.entry = self.target
+        self.final_target = self.waypoints_exiting[-1]
+
     def init_state(self, env, key_init):
-        if key_init == 'Ego Entrance':
-            state = np.zeros((4, 1))
-            state[0:2, 0] = env['Ego Entrance']['position']
-            state[2, 0] = env['Ego Entrance']['orientation'] * (np.pi / 180)  # form degrees in radiants
-            state[3, 0] = 0
 
-            key_target = str(env['Ego Entrance']['targets'][0])
-            target = np.zeros((4, 1))
-            target[0:2, 0] = env['Exits'][key_target]['position']
-            target[2, 0] = env['Exits'][key_target]['orientation'] * (np.pi / 180)  # form degrees in radiants
-            # target[3, 0] = env['Exits'][key_target]['speed limit']
-            target[3, 0] = 0
+        state = np.zeros((4, 1))
+        state[0:2, 0] = env['Entrances'][key_init]['position']
+        state[2, 0] = env['Entrances'][key_init]['orientation'] * (np.pi / 180)  # form degrees in radiants
+        state[3, 0] = random.uniform(0, env['Entrances'][key_init]['speed limit'])
 
-            self.waypoints_entering = []
-            for i in range(len(env['Ego Entrance']['waypoints'])):
-                point = np.zeros((4, 1))
-                point[0, 0] = env['Ego Entrance']['waypoints'][i][0]
-                point[1, 0] = env['Ego Entrance']['waypoints'][i][1]
-                point[2, 0] = env['Ego Entrance']['orientation'] * (np.pi / 180)
-                #point[3, 0] = env['Entrances'][key_init]['speed limit']
-                point[3, 0] = 0
-                self.waypoints_entering.append(point)
-        else:
-            state = np.zeros((4, 1))
-            state[0:2, 0] = env['Entrances'][key_init]['position']
-            state[2, 0] = env['Entrances'][key_init]['orientation'] * (np.pi / 180)  # form degrees in radiants
-            state[3, 0] = random.uniform(0, env['Entrances'][key_init]['speed limit'])
+        key_target = str(random.choice(env['Entrances'][key_init]['targets']))
+        target = np.zeros((4, 1))
+        target[0:2, 0] = env['Exits'][key_target]['position']
+        target[2, 0] = env['Exits'][key_target]['orientation'] * (np.pi / 180)  # form degrees in radiants
+        #target[3, 0] = env['Exits'][key_target]['speed limit']
+        target[3, 0] = 0
 
-            key_target = str(random.choice(env['Entrances'][key_init]['targets']))
-            target = np.zeros((4, 1))
-            target[0:2, 0] = env['Exits'][key_target]['position']
-            target[2, 0] = env['Exits'][key_target]['orientation'] * (np.pi / 180)  # form degrees in radiants
-            #target[3, 0] = env['Exits'][key_target]['speed limit']
-            target[3, 0] = 0
-
-            self.waypoints_entering = []
-            for i in range(len(env['Entrances'][key_init]['waypoints'])):
-                point = np.zeros((4,1))
-                point[0, 0] = env['Entrances'][key_init]['waypoints'][i][0]
-                point[1, 0] = env['Entrances'][key_init]['waypoints'][i][1]
-                point[2, 0] = env['Entrances'][key_init]['orientation'] * (np.pi / 180)
-                #point[3, 0] = env['Entrances'][key_init]['speed limit']
-                point[3, 0] = 0
-                self.waypoints_entering.append(point)
+        self.waypoints_entering = []
+        for i in range(len(env['Entrances'][key_init]['waypoints'])):
+            point = np.zeros((4,1))
+            point[0, 0] = env['Entrances'][key_init]['waypoints'][i][0]
+            point[1, 0] = env['Entrances'][key_init]['waypoints'][i][1]
+            point[2, 0] = env['Entrances'][key_init]['orientation'] * (np.pi / 180)
+            #point[3, 0] = env['Entrances'][key_init]['speed limit']
+            point[3, 0] = 0
+            self.waypoints_entering.append(point)
 
         self.waypoints_exiting = []
         for i in range(len(env['Exits'][key_target]['waypoints'])):
@@ -265,6 +311,183 @@ class Vehicle:
         elif self.state[2] < 0 and self.target[2] > 0:
             if self.target[2] > self.state[2] + np.pi:
                 self.target[2] += 2 * np.pi
+
+        return input
+
+    def MPC_LLM(self, agents, circular_obstacles, t, llm):
+
+        opti = ca.Opti()
+
+        X = opti.variable(self.n, self.N + 1)
+        U = opti.variable(self.m, self.N)
+
+        cost = 0
+        for k in range(self.N):
+            # LLM cost and constriants
+            cost, opti = self.OD_output(opti, cost, llm, X[:,k], U[:,k], agents)
+
+            # State and Input constraints
+            opti.subject_to(self.A_x @ X[:, k + 1] <= self.b_x)
+            opti.subject_to(self.A_u @ U[:, k] <= self.b_u)
+
+            # System dynamics constraints
+            opti.subject_to(self.dynamics_constraints(X[:, k + 1], X[:, k], U[:, k]))
+
+        cost, opti = self.OD_output(opti, cost, llm, X[:,-1], U[:,-1], agents)
+
+        # Initial state
+        opti.subject_to(X[:, 0] == self.state)
+
+        # Agents avoidance
+        if len(agents) >= 1:
+            for k in range(self.N + 1):
+                for id_agent in agents:
+                    diff = X[0:2, k] - agents[id_agent].position
+                    # Which of the distance have to keep? mine or of the other one? Or one standard for all
+                    if self.security_dist >= agents[id_agent].security_dist:
+                        opti.subject_to(ca.transpose(diff) @ diff >= self.security_dist ** 2)
+                    else:
+                        opti.subject_to(ca.transpose(diff) @ diff >= agents[id_agent].security_dist ** 2)
+
+        # Obstacle avoidance
+        if len(circular_obstacles) != 0:
+            for id_obst in circular_obstacles:
+                for k in range(self.N + 1):
+                    diff_x = (X[0, k] - circular_obstacles[id_obst]['center'][0]) ** 2 / (circular_obstacles[id_obst]['r_x']) ** 2
+                    diff_y = (X[1, k] - circular_obstacles[id_obst]['center'][1]) ** 2 / (circular_obstacles[id_obst]['r_y']) ** 2
+                    opti.subject_to(diff_x + diff_y >= 1)
+
+        opti.minimize(cost)
+        # Solve the optimization problem
+        if t == 0:  # or agents[f'{i}'].target_status
+            opti.set_initial(X, np.tile(self.state, (1, self.N + 1)).reshape(self.n, self.N + 1))
+            opti.set_initial(U, np.zeros((self.m, self.N)))
+
+        else:
+            opti.set_initial(X, self.previous_opt_sol_LLM['X'])
+            opti.set_initial(U, self.previous_opt_sol_LLM['U'])
+
+        opti.solver('ipopt')
+        sol = opti.solve()
+
+        stats = opti.stats()
+        exit_flag = stats['success']
+
+        if not exit_flag:
+            print('Solution is not optimal')
+            error()
+
+        self.previous_opt_sol_LLM['X'] = sol.value(X)
+        self.previous_opt_sol_LLM['U'] = sol.value(U)
+        self.previous_opt_sol_LLM['Cost'] = sol.value(cost)
+
+        input = sol.value(U)[:, 0].reshape((self.m, 1))
+
+        return input
+
+    def OD_output(self, opti, obj, llm, X, U, agents):
+
+        x = X[0]
+        y = X[1]
+        theta = X[2]
+        v = X[3]
+
+        delta = U[0]
+        a = U[1]
+
+        cost = llm.OD["objective"]
+        ineq_constraints = llm.OD["inequality_constraints"]
+        eq_constraints = llm.OD["equality_constraints"]
+
+        nr_ineq_const = len(ineq_constraints)
+        nr_eq_const = len(eq_constraints)
+
+        obj += eval(cost)
+        for i in range(nr_ineq_const):
+            opti.subject_to(eval(ineq_constraints[i]) <= 0)
+        for i in range(nr_eq_const):
+            opti.subject_to(eval(eq_constraints[i]) == 0)
+
+        return obj, opti
+
+    def SF(self, u_lernt, agents, circular_obstacles, t):
+
+
+        opti = ca.Opti()
+
+        X = opti.variable(self.n, self.N + 1)
+        U = opti.variable(self.m, self.N)
+        x_s = opti.variable(self.n, 1)
+        u_s = opti.variable(self.m, 1)
+
+        opti.minimize(ca.norm_2(u_lernt - U[:, 0]) ** 2)
+
+        for k in range(self.N):
+            # State and Input constraints
+            opti.subject_to(self.A_x @ X[:, k + 1] <= self.b_x)
+            opti.subject_to(self.A_u @ U[:, k] <= self.b_u)
+
+            # System dynamics constraints
+            opti.subject_to(self.dynamics_constraints(X[:, k + 1], X[:, k], U[:, k]))
+
+        # Initial state
+        opti.subject_to(X[:, 0] == self.state)
+
+        # Agents avoidance
+        if len(agents) >= 1:
+            for k in range(self.N + 1):
+                for id_agent in agents:
+                    diff = X[0:2, k] - agents[id_agent].position
+                    # Which of the distance have to keep? mine or of the other one? Or one standard for all
+                    if self.security_dist >= agents[id_agent].security_dist:
+                        opti.subject_to(ca.transpose(diff) @ diff >= self.security_dist ** 2)
+                    else:
+                        opti.subject_to(ca.transpose(diff) @ diff >= agents[id_agent].security_dist ** 2)
+
+        # Obstacle avoidance
+        if len(circular_obstacles) != 0:
+            for id_obst in circular_obstacles:
+                for k in range(self.N + 1):
+                    diff_x = (X[0, k] - circular_obstacles[id_obst]['center'][0]) ** 2 / (circular_obstacles[id_obst]['r_x']) ** 2
+                    diff_y = (X[1, k] - circular_obstacles[id_obst]['center'][1]) ** 2 / (circular_obstacles[id_obst]['r_y']) ** 2
+                    opti.subject_to(diff_x + diff_y >= 1)
+
+        # Constraint for the steady state
+        opti.subject_to(self.A_x @ x_s <= self.b_x)
+        opti.subject_to(self.A_u @ u_s <= self.b_u)
+        opti.subject_to(self.dynamics_constraints(x_s, x_s, u_s))
+        # Terminal constraints
+        opti.subject_to(X[:, -1] == x_s)  # x(N) == x_s
+        # Solve the optimization problem
+        if t == 0:  # or agents[f'{i}'].target_status
+            opti.set_initial(X, np.tile(self.state, (1, self.N + 1)).reshape(self.n, self.N + 1))
+            opti.set_initial(U, np.zeros((self.m, self.N)))
+            opti.set_initial(x_s, self.state)
+            opti.set_initial(u_s, np.zeros((self.m, 1)))
+
+        else:
+            opti.set_initial(X, self.previous_opt_sol_SF['X'])
+            opti.set_initial(U, self.previous_opt_sol_SF['U'])
+            opti.set_initial(x_s, self.previous_opt_sol_SF['x_s'])
+            opti.set_initial(u_s, self.previous_opt_sol_SF['u_s'])
+
+        opti.solver('ipopt')
+        sol = opti.solve()
+
+        stats = opti.stats()
+        exit_flag = stats['success']
+
+        if not exit_flag:
+            print('Solution is not optimal')
+            error()
+
+        self.previous_opt_sol_SF['X'] = sol.value(X)
+        self.previous_opt_sol_SF['U'] = sol.value(U)
+        self.previous_opt_sol_SF['x_s'] = sol.value(x_s)
+        self.previous_opt_sol_SF['u_s'] = sol.value(u_s)
+        self.previous_opt_sol_SF['Cost'] = sol.value(np.linalg.norm(u_lernt - sol.value(U)[:, 0]) ** 2)
+
+        input = sol.value(U)[:, 0].reshape((self.m, 1))
 
         return input
 

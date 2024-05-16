@@ -1,5 +1,0 @@
-{
-    		"objective": "ca.norm_2(x['car_1'] - North['position'])**2",
-    		"equality_constraints": ["x['car_2'] - x0['car_2']", "x['car_3'] - x0['car_3']", "x['car_4'] - x0['car_4']"],
-    		"inequality_constraints": []
-}

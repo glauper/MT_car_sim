@@ -21,7 +21,7 @@ def plot_simulation(env_type, env, results):
 
 
 def plot_simulation_env_0(env, results):
-    time = len(results['agent 0']['x coord'])
+    time = len(results['agent 0']['x coord']) -1
     fig, ax = plt.subplots()
     obstacles = env['Road Limits']
     for id in obstacles:
@@ -50,13 +50,23 @@ def plot_simulation_env_0(env, results):
 
 
     vehicles = {}
+    labels = {}
     for id_agent in range(len(results)):
         if results[f'agent {id_agent}']['type'] in env['Vehicle Specification']['types']:
             L = env['Vehicle Specification'][results[f'agent {id_agent}']['type']]['length']
             W = env['Vehicle Specification'][results[f'agent {id_agent}']['type']]['width']
             angle = results[f'agent {id_agent}']['theta'][0] * 180 / np.pi
-            vehicles[f'{id_agent}'] = patches.Rectangle((results[f'agent {id_agent}']['x coord'][0] - L/2, results[f'agent 0']['y coord'][0]- W/2),
-                                            L, W, angle=angle , rotation_point='center', facecolor='green')
+            if id_agent != len(results) - 1:
+                vehicles[f'{id_agent}'] = patches.Rectangle((results[f'agent {id_agent}']['x coord'][0] - L/2, results[f'agent 0']['y coord'][0]- W/2),
+                                            L, W, angle=angle , rotation_point='center', facecolor='green', label=str(id_agent))
+                labels[f'{id_agent}'] = ax.text(results[f'agent {id_agent}']['x coord'][0], results[f'agent 0']['y coord'][0], f'{id_agent}',
+                                                ha='center', va='center', color='white')
+            else:
+                vehicles[f'{id_agent}'] = patches.Rectangle(
+                    (results[f'agent {id_agent}']['x coord'][0] - L / 2, results[f'agent 0']['y coord'][0] - W / 2),
+                    L, W, angle=angle, rotation_point='center', facecolor='blue', label='LLM car')
+                labels[f'{id_agent}'] = ax.text(results[f'agent {id_agent}']['x coord'][0], results[f'agent 0']['y coord'][0], 'LLM',
+                                                ha='center', va='center', color='black')
             ax.add_patch(vehicles[f'{id_agent}'])
 
     """lines = {}
@@ -75,6 +85,8 @@ def plot_simulation_env_0(env, results):
             data = np.stack([x, y]).T
             vehicles[f'{id_agent}'].set_xy(data)
             vehicles[f'{id_agent}'].set_angle(angle)
+            data = np.stack([results[f'agent {id_agent}']['x coord'][frame], results[f'agent {id_agent}']['y coord'][frame]]).T
+            labels[f'{id_agent}'].set_position(data)
 
         """for k in range(len(results)):
             x = results[f'agent {k}']['x coord'][:frame]
