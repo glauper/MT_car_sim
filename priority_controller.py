@@ -75,6 +75,11 @@ class PriorityController:
             elif agents[f'{id_agent}'].exiting:
                 ids_exiting.append(f'{id_agent}')
 
+            if all(self.A_p @ agents[f'{id_agent}'].position <= self.b_p):
+                agents[f'{id_agent}'].inside_cross = True
+            else:
+                agents[f'{id_agent}'].inside_cross = False
+
         if len(ids_entering) != 0:
             if self.env_nr == 0:
                 priority = self.env_0_SiwssPriority(agents, ids_entering)
@@ -179,6 +184,8 @@ class PriorityController:
                             elif agents[id_agent].target[2] == -np.pi / 2:
                                 if agents[id_other_agent].target[2] == 0:
                                     priority_i = False
+                            else:
+                                error()
                         elif j_lot_closer_then_i:
                             priority_i = False
 

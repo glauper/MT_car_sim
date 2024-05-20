@@ -14,12 +14,12 @@ class LLM:
         self.OD_messages = []
         self.OD = {}
 
-    def call_TP(self, env_nr, query, info, ego):
+    def call_TP(self, env, query, agents, ego):
 
         prompt = general_TP_prompt()
-        description = specific_TP_prompt(env_nr, info, ego, query)
+        description = specific_TP_prompt(env, agents, ego, query)
         user_input = prompt + description
-        #print(user_input)
+        print(user_input)
 
         self.TP_messages = [
             {
@@ -40,11 +40,20 @@ class LLM:
         with open(save_TP_path, 'w') as file:
             json.dump(self.TP_messages, file)
 
-    def recall_TP(self, env_nr, query, info, ego):
+    def recall_TP(self, env_nr, query, agents, ego, why):
 
-        description = specific_TP_prompt(env_nr, info, ego, query)
-        user_input = description
-        #print(user_input)
+        if why['next_task']:
+            motivation = """
+        You have to replan because the task '""" + self.TP['tasks'][self.task_status - 1] + """' is finished. In the next the description of the actual situation.
+        """
+        elif why['SF_kicks_in']:
+            motivation = """
+        You have to replan because is seams the input computed during the execution of task '""" + self.TP['tasks'][self.task_status] + """' was not so safe. In the next the description of the actual situation.
+        """
+
+        description = specific_TP_prompt(env_nr, agents, ego, query)
+        user_input = motivation + description
+        print(user_input)
 
         self.TP_messages.append({
             "role": "user",
@@ -71,7 +80,7 @@ class LLM:
         prompt = general_OD_prompt()
         objects = specific_OD_prompt(env_nr)
         user_input = prompt + objects + 'Query: ' + self.TP['tasks'][self.task_status]
-        #print(user_input)
+        print(user_input)
 
         self.OD_messages = [
             {
@@ -95,7 +104,7 @@ class LLM:
 
         objects = specific_OD_prompt(env_nr)
         user_input = objects + 'Query: ' + self.TP['tasks'][self.task_status]
-        #print(user_input)
+        print(user_input)
 
         self.OD_messages.append({
             "role": "user",

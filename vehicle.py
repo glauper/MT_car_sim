@@ -61,11 +61,11 @@ class Vehicle:
         state[2, 0] = env['Ego Entrance']['orientation'] * (np.pi / 180)  # form degrees in radiants
         state[3, 0] = random.uniform(0, env['Ego Entrance']['speed limit'])
 
-        if query == 'go right':
+        if 'right' in query:
             key_target = '2'
-        elif query == 'go left':
+        elif 'left' in query:
             key_target = '0'
-        elif query == 'go straight':
+        elif 'straight' in query:
             key_target = '3'
 
         target = np.zeros((4, 1))
@@ -104,11 +104,12 @@ class Vehicle:
         self.velocity = state[3]
         self.entering = True
         self.exiting = False
+        self.inside_cross = False
 
         # Additional variables needed if you want to use the LLM with the car
         self.t_subtask = 0
 
-        if query == 'go right':
+        """if query == 'go right':
             self.right = {}
             self.right['state'] = self.waypoints_exiting[0]
             self.right['position'] = self.right['state'][0:2]
@@ -125,21 +126,31 @@ class Vehicle:
             self.straight['state'] = self.waypoints_exiting[0]
             self.straight['position'] = self.straight['state'][0:2]
             self.straight['theta'] = self.straight['state'][2]
-            self.straight['velocity'] = self.straight['state'][3]
+            self.straight['velocity'] = self.straight['state'][3]"""
 
         self.entry = {}
         self.entry['state'] = self.target
         self.entry['position'] = self.entry['state'][0:2]
+        self.entry['x'] = self.entry['state'][0]
+        self.entry['y'] = self.entry['state'][1]
         self.entry['theta'] = self.entry['state'][2]
         self.entry['velocity'] = self.entry['state'][3]
+
+        self.exit = {}
+        self.exit['state'] = self.waypoints_exiting[0]
+        self.exit['position'] = self.exit['state'][0:2]
+        self.exit['x'] = self.exit['state'][0]
+        self.exit['y'] = self.exit['state'][1]
+        self.exit['theta'] = self.exit['state'][2]
+        self.exit['velocity'] = self.exit['state'][3]
 
         self.final_target = {}
         self.final_target['state'] = self.waypoints_exiting[-1]
         self.final_target['position'] = self.final_target['state'][0:2]
+        self.final_target['x'] = self.final_target['state'][0]
+        self.final_target['y'] = self.final_target['state'][1]
         self.final_target['theta'] = self.final_target['state'][2]
         self.final_target['velocity'] = self.final_target['state'][3]
-
-        self.inside_cross = False
 
         self.previous_opt_sol_LLM = {}
         self.previous_opt_sol_SF = {}
@@ -194,6 +205,7 @@ class Vehicle:
         self.velocity = state[3]
         self.entering = True
         self.exiting = False
+        self.inside_cross = False
 
 
     def dynamics_propagation(self, input):

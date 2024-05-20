@@ -120,39 +120,3 @@ def normalize_angle(angle):
     if normalized_angle > np.pi:
         normalized_angle -= 2 * np.pi
     return normalized_angle
-
-def collect_info_for_prompts(env, agents, ego, priority, query):
-    info = []
-    if env['env number'] == 0:
-        info.append(str(ego.velocity[0]))
-        info.append(str(env['Ego Entrance']['speed limit']))
-        if ego.entering:
-            info.append(str(np.linalg.norm(ego.position - ego.entry['state'][0:2])))
-        elif ego.inside_cross and ego.exiting:
-            if 'right' in query:
-                info.append(str(np.linalg.norm(ego.position - ego.right['state'][0:2])))
-            elif 'left' in query:
-                info.append(str(np.linalg.norm(ego.position - ego.left['state'][0:2])))
-            elif 'straight' in query:
-                info.append(str(np.linalg.norm(ego.position - ego.straight['state'][0:2])))
-        elif ego.inside_cross == False and ego.exiting:
-            info.append(str(np.linalg.norm(ego.position - ego.final_target['state'][0:2])))
-        for id_agent in agents:
-            info.append(str(id_agent))
-            info.append(agents[id_agent].type)
-            if agents[id_agent].entering:
-                if agents[id_agent].target[2] == 0:
-                    info.append('coming from your left')
-                elif agents[id_agent].target[2] == np.pi:
-                    info.append('coming from your right')
-                elif agents[id_agent].target[2] == -np.pi/2:
-                    info.append('coming from the opposite direction to you in his lane')
-            elif agents[id_agent].exiting and all(priority.A_p @ agents[id_agent].position <= priority.b_p):
-                info.append('is moving through the cross towards its exit')
-            else:
-                info.append('is moving out of the cross towards its target')
-            info.append(str(np.linalg.norm(ego.position - agents[id_agent].position)))
-            info.append(str(agents[id_agent].velocity[0]))
-
-    return info
-

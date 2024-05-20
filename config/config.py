@@ -7,8 +7,8 @@ def SimulationConfig():
     SimulationParam = {'Save middle results': True,
                        'With LLM car': True,
                        'Timestep': 0.5, # [s]
-                       'Environment': 0,
-                       'Query': 'go right',
+                       'Environment': 1,
+                       'Query': 'go to the exit on your right',
                        'Controller': {
                            'Type': "safety filter",
                            # 'Type': "multitrajectory MPC",

@@ -2,7 +2,7 @@ import numpy as np
 import random
 from config.config import SimulationConfig, EnviromentConfig
 from functions.plot_functions import plot_simulation
-from functions.sim_initialization import results_init, results_update_and_save, agents_init, collect_info_for_prompts
+from functions.sim_initialization import results_init, results_update_and_save, agents_init
 from env_controller import EnvController
 from priority_controller import PriorityController
 from vehicle import Vehicle
@@ -46,9 +46,8 @@ else:
 priority = PriorityController("tracking MPC", SimulationParam['Environment'], env)
 
 if SimulationParam['With LLM car']:
-    info = collect_info_for_prompts(env, agents, ego_vehicle, priority, SimulationParam['Query'])
     Language_Module = LLM()
-    Language_Module.call_TP(SimulationParam['Environment'], SimulationParam['Query'], info, ego_vehicle)
+    Language_Module.call_TP(env, SimulationParam['Query'], agents, ego_vehicle)
 
     agents[str(len(agents))] = ego_vehicle
     results = results_init(env, agents)
@@ -130,8 +129,7 @@ while run_simulation:
     # If safety filter have to correct then we need to replan...how to proceed?
     if SimulationParam['With LLM car'] and ego_vehicle.previous_opt_sol_SF['Cost'] >= 10:
         print('Call TP: because SF cost are high')
-        info = collect_info_for_prompts(env, agents, ego_vehicle, priority, SimulationParam['Query'])
-        Language_Module.recall_TP(SimulationParam['Environment'], SimulationParam['Query'], info, ego_vehicle)
+        Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, {'next_task': False, 'SF_kicks_in': True})
 
     if SimulationParam['With LLM car']:
         # Dynamics propagation
@@ -186,10 +184,9 @@ while run_simulation:
                 print('End simulation: because there are no more tasks in the TP.')
                 run_simulation = False
 
-        """if next_task:
+        if next_task:
             print('Call TP: because a task is terminated and a new one begins.')
-            info = collect_info_for_prompts(env, agents, ego_vehicle, priority, SimulationParam['Query'])
-            Language_Module.recall_TP(SimulationParam['Environment'], SimulationParam['Query'], info, ego_vehicle)"""
+            Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, {'next_task': True, 'SF_kicks_in': False})
     else:
         reach_end_target = []
         for name_agent in agents:
@@ -204,7 +201,8 @@ while run_simulation:
         if all(reach_end_target):
             run_simulation = False
 
-    if t == 100:
+    if t == 200:
+        print('End simulation: because max simulation steps are reached.')
         run_simulation = False
 
 # Save the results
