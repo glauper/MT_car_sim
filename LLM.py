@@ -17,8 +17,9 @@ class LLM:
     def call_TP(self, env_nr, query, info, ego):
 
         prompt = general_TP_prompt()
-        description = specific_TP_prompt(env_nr, info, ego)
-        user_input = prompt + description + 'Query: ' +query
+        description = specific_TP_prompt(env_nr, info, ego, query)
+        user_input = prompt + description
+        #print(user_input)
 
         self.TP_messages = [
             {
@@ -41,8 +42,9 @@ class LLM:
 
     def recall_TP(self, env_nr, query, info, ego):
 
-        description = specific_TP_prompt(env_nr, info, ego)
-        user_input = description + 'Query: ' + query
+        description = specific_TP_prompt(env_nr, info, ego, query)
+        user_input = description
+        #print(user_input)
 
         self.TP_messages.append({
             "role": "user",
@@ -69,6 +71,7 @@ class LLM:
         prompt = general_OD_prompt()
         objects = specific_OD_prompt(env_nr)
         user_input = prompt + objects + 'Query: ' + self.TP['tasks'][self.task_status]
+        #print(user_input)
 
         self.OD_messages = [
             {
@@ -92,6 +95,8 @@ class LLM:
 
         objects = specific_OD_prompt(env_nr)
         user_input = objects + 'Query: ' + self.TP['tasks'][self.task_status]
+        #print(user_input)
+
         self.OD_messages.append({
             "role": "user",
             "content": user_input,
@@ -122,7 +127,7 @@ class LLM:
 
         chat_completion = client.chat.completions.create(
             messages=message,
-            model="gpt-4-turbo",  # gpt-4-turbo, gpt-3.5-turbo-0125, gpt-4o
+            model="gpt-4o",  # gpt-4-turbo, gpt-3.5-turbo-0125, gpt-4o
             response_format={"type": "json_object"},
         )
 

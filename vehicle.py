@@ -55,8 +55,6 @@ class Vehicle:
     def init_state_for_LLM(self, env, query, N):
 
         self.N = N
-        self.previous_opt_sol_LLM = {}
-        self.previous_opt_sol_SF = {}
 
         state = np.zeros((4, 1))
         state[0:2, 0] = env['Ego Entrance']['position']
@@ -111,14 +109,45 @@ class Vehicle:
         self.t_subtask = 0
 
         if query == 'go right':
-            self.right = self.waypoints_exiting[0]
+            self.right = {}
+            self.right['state'] = self.waypoints_exiting[0]
+            self.right['position'] = self.right['state'][0:2]
+            self.right['theta'] = self.right['state'][2]
+            self.right['velocity'] = self.right['state'][3]
         elif query == 'go left':
-            self.left = self.waypoints_exiting[0]
+            self.left = {}
+            self.left['state'] = self.waypoints_exiting[0]
+            self.left['position'] = self.left['state'][0:2]
+            self.left['theta'] = self.left['state'][2]
+            self.left['velocity'] = self.left['state'][3]
         elif query == 'go straight':
-            self.straight = self.waypoints_exiting[0]
+            self.straight = {}
+            self.straight['state'] = self.waypoints_exiting[0]
+            self.straight['position'] = self.straight['state'][0:2]
+            self.straight['theta'] = self.straight['state'][2]
+            self.straight['velocity'] = self.straight['state'][3]
 
-        self.entry = self.target
-        self.final_target = self.waypoints_exiting[-1]
+        self.entry = {}
+        self.entry['state'] = self.target
+        self.entry['position'] = self.entry['state'][0:2]
+        self.entry['theta'] = self.entry['state'][2]
+        self.entry['velocity'] = self.entry['state'][3]
+
+        self.final_target = {}
+        self.final_target['state'] = self.waypoints_exiting[-1]
+        self.final_target['position'] = self.final_target['state'][0:2]
+        self.final_target['theta'] = self.final_target['state'][2]
+        self.final_target['velocity'] = self.final_target['state'][3]
+
+        self.inside_cross = False
+
+        self.previous_opt_sol_LLM = {}
+        self.previous_opt_sol_SF = {}
+        # This needed for the optimization of MPC other vehicle
+        self.previous_opt_sol_SF['X'] = np.tile(self.state, (1, self.N + 1)).reshape(self.n, self.N + 1)
+        self.previous_opt_sol_SF['U'] = np.zeros((self.m, self.N))
+        self.previous_opt_sol_SF['x_s'] = self.state
+        self.previous_opt_sol_SF['u_s'] = np.zeros((self.m, 1))
 
     def init_state(self, env, key_init):
 
@@ -210,7 +239,7 @@ class Vehicle:
         self.T = 10 * self.P
         self.previous_opt_sol = {}
 
-    def trackingMPC(self, other_agents, circular_obstacles, t):
+    def trackingMPC(self, other_agents, ego, circular_obstacles, t):
 
         if self.state[2] > 0 and self.target[2] < 0:
             if self.target[2] < self.state[2] - np.pi:
@@ -263,6 +292,16 @@ class Vehicle:
                         opti.subject_to(ca.transpose(diff) @ diff >= self.security_dist ** 2)
                     else:
                         opti.subject_to(ca.transpose(diff) @ diff >= other_agents[other_agent].security_dist ** 2)
+
+        # Avoidance of ego vehicle
+        if ego != []:
+            for k in range(self.N + 1):
+                diff = X[0:2, k] - ego.previous_opt_sol_SF['X'][0:2, k]
+                # Which of the distance have to keep? mine or of the other one? Or one standard for all
+                if self.security_dist >= ego.security_dist:
+                    opti.subject_to(ca.transpose(diff) @ diff >= self.security_dist ** 2)
+                else:
+                    opti.subject_to(ca.transpose(diff) @ diff >= ego.security_dist ** 2)
 
         # Obstacle aviodance
         if len(circular_obstacles) != 0:
@@ -437,12 +476,13 @@ class Vehicle:
         if len(agents) >= 1:
             for k in range(self.N + 1):
                 for id_agent in agents:
-                    diff = X[0:2, k] - agents[id_agent].position
-                    # Which of the distance have to keep? mine or of the other one? Or one standard for all
-                    if self.security_dist >= agents[id_agent].security_dist:
-                        opti.subject_to(ca.transpose(diff) @ diff >= self.security_dist ** 2)
-                    else:
-                        opti.subject_to(ca.transpose(diff) @ diff >= agents[id_agent].security_dist ** 2)
+                    if agents[id_agent].security_dist != 0:
+                        diff = X[0:2, k] - agents[id_agent].position
+                        # Which of the distance have to keep? mine or of the other one? Or one standard for all
+                        if self.security_dist >= agents[id_agent].security_dist:
+                            opti.subject_to(ca.transpose(diff) @ diff >= self.security_dist ** 2)
+                        else:
+                            opti.subject_to(ca.transpose(diff) @ diff >= agents[id_agent].security_dist ** 2)
 
         # Obstacle avoidance
         if len(circular_obstacles) != 0:

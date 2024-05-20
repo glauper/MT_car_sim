@@ -62,11 +62,19 @@ def plot_simulation_env_0(env, results):
                 labels[f'{id_agent}'] = ax.text(results[f'agent {id_agent}']['x coord'][0], results[f'agent 0']['y coord'][0], f'{id_agent}',
                                                 ha='center', va='center', color='white')
             else:
-                vehicles[f'{id_agent}'] = patches.Rectangle(
-                    (results[f'agent {id_agent}']['x coord'][0] - L / 2, results[f'agent 0']['y coord'][0] - W / 2),
-                    L, W, angle=angle, rotation_point='center', facecolor='blue', label='LLM car')
-                labels[f'{id_agent}'] = ax.text(results[f'agent {id_agent}']['x coord'][0], results[f'agent 0']['y coord'][0], 'LLM',
-                                                ha='center', va='center', color='black')
+                if env['With LLM car']:
+                    vehicles[f'{id_agent}'] = patches.Rectangle(
+                        (results[f'agent {id_agent}']['x coord'][0] - L / 2, results[f'agent 0']['y coord'][0] - W / 2),
+                        L, W, angle=angle, rotation_point='center', facecolor='blue', label='LLM car')
+                    labels[f'{id_agent}'] = ax.text(results[f'agent {id_agent}']['x coord'][0], results[f'agent 0']['y coord'][0], 'LLM',
+                                                    ha='center', va='center', color='black')
+                else:
+                    vehicles[f'{id_agent}'] = patches.Rectangle(
+                        (results[f'agent {id_agent}']['x coord'][0] - L / 2, results[f'agent 0']['y coord'][0] - W / 2),
+                        L, W, angle=angle, rotation_point='center', facecolor='green', label=str(id_agent))
+                    labels[f'{id_agent}'] = ax.text(results[f'agent {id_agent}']['x coord'][0],
+                                                    results[f'agent 0']['y coord'][0], f'{id_agent}',
+                                                    ha='center', va='center', color='white')
             ax.add_patch(vehicles[f'{id_agent}'])
 
     """lines = {}
