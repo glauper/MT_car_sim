@@ -10,13 +10,24 @@ from priority_controller import PriorityController
 from vehicle import Vehicle
 from llm import LLM
 
-SimulationParam = SimulationConfig()
+with open('reload_sim/SimulationParam.pkl', 'rb') as file:
+    SimulationParam = pickle.load(file)
+with open('reload_sim/agents.pkl', 'rb') as file:
+    agents = pickle.load(file)
+with open('reload_sim/ego_vehicle.pkl', 'rb') as file:
+    ego_vehicle = pickle.load(file)
+
+if SimulationParam['With LLM car']:
+    with open('reload_sim/Language_Module.pkl', 'rb') as file:
+        Language_Module = pickle.load(file)
+
+    #If you want to change something, like SF acive or not
+    SimulationParam['Controller']['Ego']['Active'] = True
+
 delta_t = SimulationParam['Timestep']
 env, circular_obstacles = EnviromentConfig(SimulationParam['Environment'])
 env['env number'] = SimulationParam['Environment']
 env['With LLM car'] = SimulationParam['With LLM car']
-
-agents = agents_init(env, delta_t, SimulationParam)
 
 presence_emergency_car = False
 distance = []
@@ -36,21 +47,9 @@ order_optimization = [pair[0] for pair in sorted_pairs]
 if presence_emergency_car:
     order_optimization.insert(0, name_emergency_car)
 
-if SimulationParam['With LLM car']:
-    type = env['Vehicle Specification']['types'][0]
-    info_vehicle = env['Vehicle Specification'][type]
-    ego_vehicle = Vehicle(type, info_vehicle, delta_t)
-    ego_vehicle.init_system_constraints(env["State space"], env['Ego Entrance']['speed limit'])
-    ego_vehicle.init_state_for_LLM(env, SimulationParam['Query'], SimulationParam['Controller']['Ego']['Horizon'])
-else:
-    ego_vehicle = []
-
 priority = PriorityController(SimulationParam['Controller']['Agents']['Type'], SimulationParam['Environment'], env)
 
 if SimulationParam['With LLM car']:
-    Language_Module = LLM()
-    Language_Module.call_TP(env, SimulationParam['Query'], agents, ego_vehicle)
-
     agents[str(len(agents))] = ego_vehicle
     results = results_init(env, agents)
     agents.pop(str(len(agents)-1))
@@ -58,17 +57,6 @@ if SimulationParam['With LLM car']:
 else:
     results = results_init(env, agents)
     options_entrance = list(env['Entrances'].keys())
-
-# Save some info to eventually reload the simulation
-with open('reload_sim/SimulationParam.pkl', 'wb') as file:
-    pickle.dump(SimulationParam, file)
-with open('reload_sim/agents.pkl', 'wb') as file:
-    pickle.dump(agents, file)
-with open('reload_sim/ego_vehicle.pkl', 'wb') as file:
-    pickle.dump(ego_vehicle, file)
-if SimulationParam['With LLM car']:
-    with open('reload_sim/Language_Module.pkl', 'wb') as file:
-        pickle.dump(Language_Module, file)
 
 t = 0
 run_simulation = True

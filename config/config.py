@@ -15,7 +15,7 @@ def SimulationConfig():
                                'Horizon': 20
                            },
                            'Ego': {
-                               'Active': True,
+                               'Active': False,
                                'Type': "safety filter",
                                'Horizon': 20
                            }
