@@ -68,7 +68,7 @@ class Vehicle:
                         self.b_x[6, 0] = env['Exits'][exit]['speed limit']
 
     def init_state_for_LLM(self, env, query, N):
-
+        self.LLM_car = True
         self.N = N
 
         state = np.zeros((4, 1))
@@ -170,16 +170,14 @@ class Vehicle:
         self.final_target['velocity'] = self.final_target['state'][3]
         self.final_target['max vel'] = env['Exits'][key_target]['speed limit']
 
-        self.previous_opt_sol_LLM = {}
         self.previous_opt_sol_SF = {}
+        self.previous_opt_sol = {}
         # This needed for the optimization of MPC other vehicle
-        self.previous_opt_sol_SF['X'] = np.tile(self.state, (1, self.N + 1)).reshape(self.n, self.N + 1)
-        self.previous_opt_sol_SF['U'] = np.zeros((self.m, self.N))
-        self.previous_opt_sol_SF['x_s'] = self.state
-        self.previous_opt_sol_SF['u_s'] = np.zeros((self.m, 1))
+        self.previous_opt_sol['X'] = np.tile(self.state, (1, self.N + 1)).reshape(self.n, self.N + 1)
+        self.previous_opt_sol['U'] = np.zeros((self.m, self.N))
 
     def init_state(self, env, key_init):
-
+        self.LLM_car = False
         state = np.zeros((4, 1))
         state[0:2, 0] = env['Entrances'][key_init]['position']
         state[2, 0] = env['Entrances'][key_init]['orientation'] * (np.pi / 180)  # form degrees in radiants
@@ -268,6 +266,8 @@ class Vehicle:
         self.P = 10
         self.T = 10 * self.P
         self.previous_opt_sol = {}
+        self.previous_opt_sol['X'] = np.tile(self.state, (1, self.N + 1)).reshape(self.n, self.N + 1)
+        self.previous_opt_sol['U'] = np.zeros((self.m, self.N))
 
     def trackingMPC(self, other_agents, ego, circular_obstacles, t):
 
@@ -328,7 +328,7 @@ class Vehicle:
         # Avoidance of ego vehicle
         if ego != []:
             for k in range(self.N + 1):
-                diff = X[0:2, k] - ego.previous_opt_sol_SF['X'][0:2, k]
+                diff = X[0:2, k] - ego.previous_opt_sol['X'][0:2, k]
                 # Which of the distance have to keep? mine or of the other one? Or one standard for all
                 if self.security_dist >= ego.security_dist:
                     opti.subject_to(ca.transpose(diff) @ diff >= self.security_dist ** 2 + epsilon)
@@ -435,8 +435,8 @@ class Vehicle:
             opti.set_initial(U, np.zeros((self.m, self.N)))
 
         else:
-            opti.set_initial(X, self.previous_opt_sol_LLM['X'])
-            opti.set_initial(U, self.previous_opt_sol_LLM['U'])
+            opti.set_initial(X, self.previous_opt_sol['X'])
+            opti.set_initial(U, self.previous_opt_sol['U'])
 
         opti.solver('ipopt')
         sol = opti.solve()
@@ -448,9 +448,9 @@ class Vehicle:
             print('Solution is not optimal')
             error()
 
-        self.previous_opt_sol_LLM['X'] = sol.value(X)
-        self.previous_opt_sol_LLM['U'] = sol.value(U)
-        self.previous_opt_sol_LLM['Cost'] = sol.value(cost)
+        self.previous_opt_sol['X'] = sol.value(X)
+        self.previous_opt_sol['U'] = sol.value(U)
+        self.previous_opt_sol['Cost'] = sol.value(cost)
 
         input = sol.value(U)[:, 0].reshape((self.m, 1))
 

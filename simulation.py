@@ -88,6 +88,8 @@ while run_simulation:
         next_task = False
         if 'brakes()' in Language_Module.TP['tasks'][Language_Module.task_status]:
             ego_brake = True
+            # This such because when it brakes does not call all the time TP base on the old SF cost
+            ego_vehicle.previous_opt_sol_SF['Cost'] = 0
             if 'wait' in Language_Module.TP['tasks'][Language_Module.task_status]:
                 # ??? Here is necessay or we simply replan until the LLM decid to move on???
                 pattern = r'agent (\d+)'
@@ -121,7 +123,7 @@ while run_simulation:
                 ego_vehicle.inside_cross = False
 
             # check if the task is finished with the cost of the optimization problem
-            print('Cost LLM ', ego_vehicle.previous_opt_sol_LLM['Cost'])
+            print('Cost LLM ', ego_vehicle.previous_opt_sol['Cost'])
             if 'entry' in Language_Module.TP['tasks'][Language_Module.task_status]:
                 if np.linalg.norm(ego_vehicle.position - ego_vehicle.entry['position']) <= 1:
                     next_task = True

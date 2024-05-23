@@ -77,12 +77,11 @@ def plot_simulation_env_0(env, results):
                                                     ha='center', va='center', color='white')
             ax.add_patch(vehicles[f'{id_agent}'])
 
-    """lines = {}
-    scats = {}
+    lines = {}
+    #scats = {}
     for k in range(len(results)):
-        lines[f'line{k}'] = ax.plot(results[f'agent {k}']['x coord'][0], results[f'agent {k}']['y coord'][0], c="b")[0]  # label=f'v0 = {v02} m/s'
-        scats[f'line{k}'] = ax.scatter(results[f'agent {k}']['x coord'][0], results[f'agent {k}']['y coord'][0], c="r", s=5, label=f'car_{k + 1}')
-    """
+        lines[f'line{k}'] = ax.plot(results[f'agent {k}']['x coord pred'][0], results[f'agent {k}']['y coord pred'][0], c="red", linestyle='--')[0]  # label=f'v0 = {v02} m/s'
+        #scats[f'line{k}'] = ax.scatter(results[f'agent {k}']['x coord'][0], results[f'agent {k}']['y coord'][0], c="r", s=5, label=f'car_{k + 1}')
 
     def update(frame):
 
@@ -95,6 +94,8 @@ def plot_simulation_env_0(env, results):
             vehicles[f'{id_agent}'].set_angle(angle)
             data = np.stack([results[f'agent {id_agent}']['x coord'][frame], results[f'agent {id_agent}']['y coord'][frame]]).T
             labels[f'{id_agent}'].set_position(data)
+            lines[f'line{id_agent}'].set_xdata(results[f'agent {id_agent}']['x coord pred'][frame])
+            lines[f'line{id_agent}'].set_ydata(results[f'agent {id_agent}']['y coord pred'][frame])
 
         """for k in range(len(results)):
             x = results[f'agent {k}']['x coord'][:frame]
