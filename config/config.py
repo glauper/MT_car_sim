@@ -7,12 +7,19 @@ def SimulationConfig():
     SimulationParam = {'Save middle results': True,
                        'With LLM car': True,
                        'Timestep': 0.5, # [s]
-                       'Environment': 1,
-                       'Query': 'go to the exit on your right',
+                       'Environment': 3,
+                       'Query': 'go to the exit on the right',
                        'Controller': {
-                           'Type': "safety filter",
-                           # 'Type': "multitrajectory MPC",
-                           'Horizon': 20}
+                           'Agents': {
+                               'Type': "tracking MPC",
+                               'Horizon': 20
+                           },
+                           'Ego': {
+                               'Active': True,
+                               'Type': "safety filter",
+                               'Horizon': 20
+                           }
+                       }
                        }
 
     return SimulationParam

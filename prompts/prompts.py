@@ -4,7 +4,7 @@ def general_TP_prompt():
         You are a helpful assistant in charge of controlling an autonomous car that move in two dimensional space.
         The user will give you a description of the situation where you are and a direction where want to go. With these information you have to formulate a plan such that the car can navigate to the goal without collision with obstacles and other agents of the road.
         Before the description, two list are given. 
-        One is called `objects` and collects all the name of the waypoints that can be use as targets in the instructions for the car you have to control.
+        One is called `objects` and collects all the name of the waypoints that can be use as targets in the instructions for the car you have to control. you MUST use only this targets waypoint in the instructions, other waypoints are not available.
         The other is called `agents` and collects all the name of the agents that are present in the cross.
         It is possible that the user will ask you to replan base on a new and more recent description.
 
@@ -17,9 +17,10 @@ def general_TP_prompt():
             (2) In general as waypoints there are a 'entry', a 'exit' and a 'final_target'. The first plan should go through these waypoints in this order.
             (3) If you have to replan and you are at a distance of less then 1 m from one of the waypoints, if the priority permit that, you can start the new plan direct with the next waypoint. For example if you are at a distance of 0.1 m from the entry, you can start the new plan with a task containing the exit object.
             (4) If possible, when you are doing a replan, do not go back with the order of the waypoints, for example if in a previous plan you have gone to the exit, is better to not go back to the entry.
-            (5) If you have to give priority to another agents, you have to give the instruction to wait this agents to pass, for example "wait agents 0 to pass".
+            (5) If you have to give priority to another agents, you have to give the instruction to wait this agents to pass, for example "brakes() and wait agents 0 to pass".
             (6) If an agent is leaving the cross, it should not be considered for the priorities.
-            (7) Try to wait that the distance from the other agents is bigger then 5 m before to enter a cross
+            (7) Try to wait that the distance from the other agents is bigger then 5 m before to enter a cross.
+            (8) If you want to instruct the car to move, you MUST always specify also the maximum speed.
         
         The description of the situation will give you this list of information about the other agents:
             (1) The type of vehicle
@@ -38,7 +39,7 @@ def general_TP_prompt():
         objects = ['entry', 'exit', 'final_target']
         agents = ['0', '1']
         # Description: You are approaching a road cross with four entrances and four exits. There are no special road signs, so the right hand rule applies. 
-        You are coming in the cross from one of the entrances, where the maximum permitted velocity is 2 m/s.
+        You are coming in the cross from one of the entrances, where the maximum permitted speed is 2 m/s.
         The entry in the cross of your lane is 2 m away and you are moving with a velocity of 2 m/s. The other three entries to the cross are around 12 m away from your entry.
         There are other 2 agents moving in the region of the road cross.
         Information for agent 0:
@@ -55,13 +56,13 @@ def general_TP_prompt():
             (5) has a direction of 90 degrees clockwise with respect to your orientation 
         # Query: go to the exit on your left
         {
-            "tasks": ["go to the entry", "wait agent 0 to pass" ,"go the exits on the left", "go to final_target"]
+            "tasks": ["go to the entry, the maximum speed is 2 m/s", "brakes() and wait agent 0 to pass" ,"go the exits on the left, the maximum speed is 2 m/s", "go to final_target, the maximum speed is 2 m/s"]
         }
         
         objects = ['entry', 'exit', 'final_target']
         agents = ['0', '1']
         # Description: You are approaching a road cross with four entrances and four exits. There are no special road signs, so the right hand rule applies. 
-        You are coming in the cross from one of the entrances, where the maximum permitted velocity is 2 m/s.
+        You are coming in the cross from one of the entrances, where the maximum permitted speed is 2 m/s.
         The entry in the cross of your lane is 2 m away and you are moving with a velocity of 2 m/s. The other three entries to the cross are around 12 m away from your entry.
         There are other 2 agents moving in the region of the road cross.
         Information for agent 0:
@@ -78,14 +79,14 @@ def general_TP_prompt():
             (5) has a direction of 90 degrees counterclockwise with respect to your orientation 
         # Query: go to the exit on your right
         {
-            "tasks": ["go to the entry", "wait agent 1 to pass", "go to the exit on the right", "go to final_target"]
+            "tasks": ["go to the entry, the maximum speed is 2 m/s", "brakes() and wait agent 1 to pass", "go to the exit on the right, the maximum speed is 2 m/s", "go to final_target, the maximum speed is 2 m/s"]
         }
         """
     return TP_PROMPT
 
 def specific_TP_prompt(env, agents, ego, query):
 
-    if env['env number'] == 0:
+    if env['env number'] == 0 or env['env number'] == 3:
         TP_PROMPT = specific_TP_prompt_env_0(env, agents, ego, query)
     elif env['env number'] == 1:
         TP_PROMPT = specific_TP_prompt_env_1(env, agents, ego, query)
@@ -100,26 +101,19 @@ def specific_TP_prompt_env_0(env, agents, ego, query):
     if ego.entering:
         description = """
         Description: You are approaching a road cross with four entrances and four exits. There are no special road signs, so the right hand rule applies. 
-        You are coming in the cross from one of the entrances, where the maximum permitted velocity is """+str(env['Ego Entrance']['speed limit'])+""" m/s.
+        You are coming in the cross from one of the entrances, where the maximum permitted speed is """+str(ego.entry['max vel'])+""" m/s.
         The entry in the cross of your lane is """+str(round(np.linalg.norm(ego.position - ego.entry['position']), 1))+""" m away and you are moving with a velocity of """+str(round(ego.velocity[0], 1))+""" m/s. The other three entries to the cross are around 12 m away from your entry.
         There are other """+str(len(agents))+""" agents moving in the region of the road cross.
         """
     elif ego.exiting and ego.inside_cross:
         description = """
-        Description: You are inside a road cross with four entrances and four exits, therefore you can assumed you have already respected the priority and now you have to go to your exit, avoiding collision with other agents. The maximum permitted velocity is """ + str(env['Ego Entrance']['speed limit']) + """ m/s.
+        Description: You are inside a road cross with four entrances and four exits, therefore you can assumed you have already respected the priority and now you have to go to your exit, avoiding collision with other agents. The maximum permitted speed is """ + str(ego.exit['max vel']) + """ m/s.
         The exit in the cross of your lane is """ + str(round(np.linalg.norm(ego.position - ego.exit['position']), 1)) + """ m away. You are moving with a velocity of """ + str(round(ego.velocity[0],1)) + """ m/s.
         There are other """ + str(len(agents)) + """ agents moving in the region of the road cross.
         """
-
-    elif ego.exiting and ego.inside_cross == False:
-        if 'right' in query:
-            max_vel = env['Exits']['2']['speed limit']
-        if 'left' in query:
-            max_vel = env['Exits']['0']['speed limit']
-        if 'straight' in query:
-            max_vel = env['Exits']['3']['speed limit']
+    else: #if ego.exiting and ego.inside_cross == False:
         description = """
-        Description: You are leaving the cross, therefore you have only to reach your final_target avoiding collision with other agents. The maximum permitted velocity is """ + str(max_vel) + """ m/s.
+        Description: You are leaving the cross, therefore you have only to reach your final_target avoiding collision with other agents. The maximum permitted speed is """ + str(ego.final_target['max vel']) + """ m/s.
         The final_target in your lane is """ + str(round(np.linalg.norm(ego.position - ego.final_target['position']),1)) + """ m away. You are moving with a velocity of """ + str(round(ego.velocity[0],1)) + """ m/s.
         There are other """ + str(len(agents)) + """ agents moving in the region of the road cross.
         """
@@ -139,7 +133,6 @@ def specific_TP_prompt_env_0(env, agents, ego, query):
             dir = str(round(abs(diff_angle[0]),1)) + """ degrees clockwise"""
 
         if agents[id_agent].entering:
-            print('Here 1')
             agent_orientation = agents[id_agent].target[2]
             if agent_orientation > np.pi:
                 agent_orientation = agent_orientation - 2 * np.pi
@@ -151,8 +144,6 @@ def specific_TP_prompt_env_0(env, agents, ego, query):
             elif agent_orientation == np.pi:  # coming from the right direction
                 info_1 = """is coming from the right entrance of the cross with respect to you"""
         elif agents[id_agent].exiting and agents[id_agent].inside_cross:
-            print('Here 2')
-            print(agents[id_agent].target[2])
             agent_orientation = agents[id_agent].target[2]
             if agent_orientation > np.pi:
                 agent_orientation = agent_orientation - 2 * np.pi
@@ -166,7 +157,6 @@ def specific_TP_prompt_env_0(env, agents, ego, query):
             elif agent_orientation == - np.pi / 2:
                 info_1 = """is going to the exit of the cross next ot you"""
         else:
-            print('Here 3')
             info_1 = """is going away from the cross"""
 
         description = description + """
@@ -191,26 +181,20 @@ def specific_TP_prompt_env_1(env, agents, ego, query):
     if ego.entering:
         description = """
         Description: You are approaching a road cross with four entrances and four exits. At the entry of your lane in the cross there is a stop signal. 
-        You are coming in the cross from one of the entrances, where the maximum permitted velocity is """+str(env['Ego Entrance']['speed limit'])+""" m/s.
+        You are coming in the cross from one of the entrances, where the maximum permitted speed is """+str(ego.entry['max vel'])+""" m/s.
         The entry in the cross of your lane is """+str(round(np.linalg.norm(ego.position - ego.entry['position']), 1))+""" m away and you are moving with a velocity of """+str(round(ego.velocity[0], 1))+""" m/s. The other three entries to the cross are around 12 m away from your entry.
         There are other """+str(len(agents))+""" agents moving in the region of the road cross.
         """
     elif ego.exiting and ego.inside_cross:
         description = """
-        Description: You are inside a road cross with four entrances and four exits, therefore you can assumed you have already respected the priority and now you have to go to your exit, avoiding collision with other agents. The maximum permitted velocity is """ + str(env['Ego Entrance']['speed limit']) + """ m/s.
+        Description: You are inside a road cross with four entrances and four exits, therefore you can assumed you have already respected the priority and now you have to go to your exit, avoiding collision with other agents. The maximum permitted speed is """ + str(ego.exit['max vel']) + """ m/s.
         The exit in the cross of your lane is """ + str(round(np.linalg.norm(ego.position - ego.exit['position']), 1)) + """ m away. You are moving with a velocity of """ + str(round(ego.velocity[0],1)) + """ m/s.
         There are other """ + str(len(agents)) + """ agents moving in the region of the road cross.
         """
 
     else:
-        if 'right' in query:
-            max_vel = env['Exits']['2']['speed limit']
-        if 'left' in query:
-            max_vel = env['Exits']['0']['speed limit']
-        if 'straight' in query:
-            max_vel = env['Exits']['3']['speed limit']
         description = """
-        Description: You are leaving the cross, therefore you have only to reach your final_target avoiding collision with other agents. The maximum permitted velocity is """ + str(max_vel) + """ m/s.
+        Description: You are leaving the cross, therefore you have only to reach your final_target avoiding collision with other agents. The maximum permitted speed is """ + str(ego.final_target['max vel']) + """ m/s.
         The final_target in your lane is """ + str(round(np.linalg.norm(ego.position - ego.final_target['position']),1)) + """ m away. You are moving with a velocity of """ + str(round(ego.velocity[0],1)) + """ m/s.
         There are other """ + str(len(agents)) + """ agents moving in the region of the road cross.
         """
@@ -230,7 +214,6 @@ def specific_TP_prompt_env_1(env, agents, ego, query):
             dir = str(round(abs(diff_angle[0]),1)) + """ degrees clockwise"""
 
         if agents[id_agent].entering:
-            print('Here 1')
             agent_orientation = agents[id_agent].target[2]
             if agent_orientation > np.pi:
                 agent_orientation = agent_orientation - 2 * np.pi
@@ -242,8 +225,6 @@ def specific_TP_prompt_env_1(env, agents, ego, query):
             elif agent_orientation == np.pi:  # coming from the right direction
                 info_1 = """is coming from the right entrance of the cross with respect to you"""
         elif agents[id_agent].exiting and agents[id_agent].inside_cross:
-            print('Here 2')
-            print(agents[id_agent].target[2])
             agent_orientation = agents[id_agent].target[2]
             if agent_orientation > np.pi:
                 agent_orientation = agent_orientation - 2 * np.pi
@@ -257,7 +238,6 @@ def specific_TP_prompt_env_1(env, agents, ego, query):
             elif agent_orientation == - np.pi / 2:
                 info_1 = """is going to the exit of the cross next ot you"""
         else:
-            print('Here 3')
             info_1 = """is going away from the cross"""
 
         description = description + """
@@ -296,7 +276,8 @@ def general_OD_prompt():
             (13) To have access to the current velocity v of your car you can use `self.velocity`.
             (14) The input `U` is two dimensional, where `U[0]` is the acceleration of the car and `U[1]` is the steering angle of the car.
             (15) The variable `t` represents the simulation time.
-            (16) The only information you can have access to for other agents is position (x, y).
+            (16) The names of the agents that are moving in your same space are listed in the list agents before the Query.
+            (16) The only information you can have access about other agents is position (x, y).
             (17) To have access to the position of another agent, for example agent 0, you can use `agents['0'].position`.
             (18) The objects listed before the Query are target state of four dimension, that can be used in the optimization. No other object can be used in the optimization.
             (19) The have access to the target state represented by the objects you can use `self.object['state']`, for example for the objects = ['exit'] you can use `self.exit['state']`. 
@@ -316,47 +297,59 @@ def general_OD_prompt():
         You must format your response into a json. Here are a few examples:
 
         objects = ['entry', 'exit', 'final_target']
-        # Query: "go to the entry"
+        agents = ['0','1']
+        # Query: "go to the entry, the maximum speed is 1 m/s"
         {
             "objective": "ca.norm_2(X - self.entry['state'])**2",
             "equality_constraints": [],
-            "inequality_constraints": []
+            "inequality_constraints": ["X[3] - 1"]
         }
 
         objects = ['entry', 'exit', 'final_target']
-        # Query: go to the exit on the left
+        agents = ['0','1']
+        # Query: go to the exit on the left, the maximum speed is 2 m/s
         {
             "objective": "ca.norm_2(X - self.exit['state'])**2",
             "equality_constraints": [],
-            "inequality_constraints": []
+            "inequality_constraints": ["X[3] - 2"]
         }
 
         objects = ['entry', 'exit', 'final_target']
-        # Query: go straight
+        agents = ['0','1']
+        # Query: go straight, the maximum speed is 2 m/s
         {
             "objective": "ca.norm_2(X - self.exit['state'])**2",
             "equality_constraints": [],
-            "inequality_constraints": []
+            "inequality_constraints": ["X[3] - 2"]
         }
         
         objects = ['entry', 'exit', 'final_target']
-        # Query: go to final target
+        agents = ['0','1']
+        # Query: go to final target, the maximum speed is 3 m/s
         {
             "objective": "ca.norm_2(X - self.final_target['state'])**2",
             "equality_constraints": [],
-            "inequality_constraints": []
+            "inequality_constraints": ["X[3] - 3"]
         }
         """
 
     return OD_PROMPT
 
-def specific_OD_prompt(env_nr):
-    if env_nr == 0:
+def specific_OD_prompt(env_nr, agents):
+
+    if env_nr == 0 or env_nr == 1 or env_nr == 3:
         OD_PROMPT = """
         objects = ['entry', 'exit', 'final_target']
         """
-    elif env_nr == 1:
-        OD_PROMPT = """
-                objects = ['entry', 'exit', 'final_target']
-                """
+
+    name_agents = """agents = ["""
+    for i, id_agent in enumerate(agents):
+        if i == len(agents) - 1:
+            name_agents = name_agents + """'""" + id_agent + """']
+        """
+        else:
+            name_agents = name_agents + """'""" + id_agent + """', """
+
+    OD_PROMPT = OD_PROMPT + name_agents
+
     return OD_PROMPT

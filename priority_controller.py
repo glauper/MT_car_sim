@@ -65,7 +65,7 @@ class PriorityController:
 
         return agents
 
-    def SwissPriority(self, agents, order_optimization):
+    def SwissPriority(self, agents, order_optimization, ego):
 
         ids_entering = []
         ids_exiting = []
@@ -124,7 +124,13 @@ class PriorityController:
                         agents[id_priority_vehicle].target = agents[id_priority_vehicle].waypoints_exiting.pop(0)
                         agents[id_priority_vehicle].exiting = True
                         agents[id_priority_vehicle].entering = False
-                        if id_priority_vehicle != str(len(agents)-1):
+                        if ego:
+                            if id_priority_vehicle != str(len(agents)-1):
+                                print(id_priority_vehicle)
+                                print(str(len(agents)))
+                                order_optimization.remove(id_priority_vehicle)
+                                order_optimization.insert(len(ids_exiting), id_priority_vehicle)
+                        else:
                             print(id_priority_vehicle)
                             print(str(len(agents)))
                             order_optimization.remove(id_priority_vehicle)
@@ -135,7 +141,15 @@ class PriorityController:
                         agents[id_priority_vehicle].target = agents[id_priority_vehicle].waypoints_exiting.pop(0)
                         agents[id_priority_vehicle].exiting = True
                         agents[id_priority_vehicle].entering = False
-                        if id_priority_vehicle != str(len(agents)-1):
+                        if ego:
+                            if id_priority_vehicle != str(len(agents) - 1):
+                                print(id_priority_vehicle)
+                                print(str(len(agents)))
+                                order_optimization.remove(id_priority_vehicle)
+                                order_optimization.insert(len(ids_exiting), id_priority_vehicle)
+                        else:
+                            print(id_priority_vehicle)
+                            print(str(len(agents)))
                             order_optimization.remove(id_priority_vehicle)
                             order_optimization.insert(len(ids_exiting), id_priority_vehicle)
 

@@ -20,8 +20,9 @@ def agents_init(env, delta_t, SimulationParam):
         key_init = random.choice(options_init_state)
         agents[f'{i}'].init_state(env, key_init)
         agents[f'{i}'].init_system_constraints(env["State space"], env['Entrances'][key_init]['speed limit'])
+        agents[f'{i}'].update_velocity_limits(env)
         options_init_state.remove(key_init)
-        agents[f'{i}'].init_trackingMPC(SimulationParam['Controller']['Horizon'])
+        agents[f'{i}'].init_trackingMPC(SimulationParam['Controller']['Agents']['Horizon'])
         if SimulationParam['Environment'] == 5:
             agents[f'{i}'] = env_5_init(agents[f'{i}'])
 

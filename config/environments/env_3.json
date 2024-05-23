@@ -1,5 +1,5 @@
 {"env": {
-	"Number Vehicles": 4,
+	"Number Vehicles": 2,
 	"Number Pedestrians": 0,
 	"State space": {
 		"x limits": [-30, 30],

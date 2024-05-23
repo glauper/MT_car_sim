@@ -30,10 +30,11 @@ class Vehicle:
         self.b_x[3, 0] = -state_space["y limits"][0]
         self.b_x[4, 0] = 2 * np.pi
         self.b_x[5, 0] = 2 * np.pi
-        if street_vel_limit <= self.vel_limits[1]:
+        """if street_vel_limit <= self.vel_limits[1]:
             self.b_x[6, 0] = street_vel_limit
         else:
-            self.b_x[6, 0] = self.vel_limits[1]
+            self.b_x[6, 0] = self.vel_limits[1]"""
+        self.b_x[6, 0] = self.vel_limits[1]
         self.b_x[7, 0] = -self.vel_limits[0]
 
         self.A_u = np.zeros((self.m * 2, self.m))
@@ -48,9 +49,23 @@ class Vehicle:
         self.b_u[3, 0] = -self.steering_limits[0] * (np.pi / 180)
 
     def update_velocity_limits(self, env):
-        for exit in env['Exits']:
-            if env['Exits'][exit]['position'][0] == self.target[0] and env['Exits'][exit]['position'][1] == self.target[1]:
-                self.b_x[6, 0] = env['Exits'][exit]['speed limit']
+
+        if self.entering:
+            for entrance in env['Entrances']:
+                for point in range(len(env['Entrances'][entrance]['waypoints'])):
+                    if (env['Entrances'][entrance]['waypoints'][point][0] == self.target[0] and
+                            env['Entrances'][entrance]['waypoints'][point][1] == self.target[1]):
+                        self.b_x[6, 0] = env['Entrances'][entrance]['speed limit']
+
+        elif self.exiting:
+            for exit in env['Exits']:
+                if (env['Exits'][exit]['position'][0] == self.target[0] and
+                        env['Exits'][exit]['position'][1] == self.target[1]):
+                    self.b_x[6, 0] = env['Exits'][exit]['speed limit']
+                for point in range(len(env['Exits'][exit]['waypoints'])):
+                    if (env['Exits'][exit]['waypoints'][point][0] == self.target[0] and
+                            env['Exits'][exit]['waypoints'][point][1] == self.target[1]):
+                        self.b_x[6, 0] = env['Exits'][exit]['speed limit']
 
     def init_state_for_LLM(self, env, query, N):
 
@@ -135,6 +150,7 @@ class Vehicle:
         self.entry['y'] = self.entry['state'][1]
         self.entry['theta'] = self.entry['state'][2]
         self.entry['velocity'] = self.entry['state'][3]
+        self.entry['max vel'] = env['Ego Entrance']['speed limit']
 
         self.exit = {}
         self.exit['state'] = self.waypoints_exiting[0]
@@ -143,6 +159,7 @@ class Vehicle:
         self.exit['y'] = self.exit['state'][1]
         self.exit['theta'] = self.exit['state'][2]
         self.exit['velocity'] = self.exit['state'][3]
+        self.exit['max vel'] = env['Exits'][key_target]['speed limit']
 
         self.final_target = {}
         self.final_target['state'] = self.waypoints_exiting[-1]
@@ -151,6 +168,7 @@ class Vehicle:
         self.final_target['y'] = self.final_target['state'][1]
         self.final_target['theta'] = self.final_target['state'][2]
         self.final_target['velocity'] = self.final_target['state'][3]
+        self.final_target['max vel'] = env['Exits'][key_target]['speed limit']
 
         self.previous_opt_sol_LLM = {}
         self.previous_opt_sol_SF = {}
@@ -267,6 +285,7 @@ class Vehicle:
         U = opti.variable(self.m, self.N)
         x_s = opti.variable(self.n, 1)
         u_s = opti.variable(self.m, 1)
+        epsilon = opti.variable(1, 1)
 
         cost = 0
         for k in range(self.N):
@@ -283,6 +302,7 @@ class Vehicle:
         diff_X = X[:, -1] - x_s
         diff_target = self.target - x_s
         cost += ca.transpose(diff_X) @ self.P @ diff_X + ca.transpose(diff_target) @ self.T @ diff_target
+        cost += epsilon**2
 
         # Initial state
         opti.subject_to(X[:, 0] == self.state)
@@ -311,9 +331,9 @@ class Vehicle:
                 diff = X[0:2, k] - ego.previous_opt_sol_SF['X'][0:2, k]
                 # Which of the distance have to keep? mine or of the other one? Or one standard for all
                 if self.security_dist >= ego.security_dist:
-                    opti.subject_to(ca.transpose(diff) @ diff >= self.security_dist ** 2)
+                    opti.subject_to(ca.transpose(diff) @ diff >= self.security_dist ** 2 + epsilon)
                 else:
-                    opti.subject_to(ca.transpose(diff) @ diff >= ego.security_dist ** 2)
+                    opti.subject_to(ca.transpose(diff) @ diff >= ego.security_dist ** 2 + epsilon)
 
         # Obstacle aviodance
         if len(circular_obstacles) != 0:
@@ -384,7 +404,7 @@ class Vehicle:
             # System dynamics constraints
             opti.subject_to(self.dynamics_constraints(X[:, k + 1], X[:, k], U[:, k]))
 
-        cost, opti = self.OD_output(opti, cost, llm, X[:,-1], U[:,-1], agents)
+        cost, opti = self.OD_output(opti, cost, llm, X[:,-1], U[:,-1], agents) # U[-1] and X[-1] do not corresponds!
 
         # Initial state
         opti.subject_to(X[:, 0] == self.state)
