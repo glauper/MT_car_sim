@@ -5,9 +5,9 @@ import json
 def SimulationConfig():
 
     SimulationParam = {'Save middle results': True,
-                       'With LLM car': True,
+                       'With LLM car': False,
                        'Timestep': 0.5, # [s]
-                       'Environment': 3,
+                       'Environment': 0,
                        'Query': 'go to the exit on the right',
                        'Controller': {
                            'Agents': {

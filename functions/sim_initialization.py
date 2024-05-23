@@ -81,10 +81,6 @@ def results_init(env, agents):
     for id_vehicle in range(len(agents)):
         results[f'agent {id_vehicle}'] = {}
         results[f'agent {id_vehicle}']['type'] = agents[f'{id_vehicle}'].type
-        """results[f'agent {id_vehicle}']['x coord'] = [float(agents[f'{id_vehicle}'].x)]
-        results[f'agent {id_vehicle}']['y coord'] = [float(agents[f'{id_vehicle}'].y)]
-        results[f'agent {id_vehicle}']['velocity'] = [float(agents[f'{id_vehicle}'].velocity)]
-        results[f'agent {id_vehicle}']['theta'] = [float(agents[f'{id_vehicle}'].theta)]"""
 
         results[f'agent {id_vehicle}']['x coord'] = []
         results[f'agent {id_vehicle}']['y coord'] = []
@@ -100,12 +96,13 @@ def results_init(env, agents):
 
     return results
 
-def results_update_and_save(env, agent, id_agent, results):
+def results_update_and_save(env, agents, results):
 
-    results[f'agent {id_agent}']['x coord'].append(float(agent.x))
-    results[f'agent {id_agent}']['y coord'].append(float(agent.y))
-    results[f'agent {id_agent}']['velocity'].append(float(agent.velocity))
-    results[f'agent {id_agent}']['theta'].append(float(agent.theta))
+    for id_vehicle, name_vehicle in enumerate(agents):
+        results[f'agent {id_vehicle}']['x coord'].append(float(agents[name_vehicle].x))
+        results[f'agent {id_vehicle}']['y coord'].append(float(agents[name_vehicle].y))
+        results[f'agent {id_vehicle}']['velocity'].append(float(agents[name_vehicle].velocity))
+        results[f'agent {id_vehicle}']['theta'].append(float(agents[name_vehicle].theta))
 
     results_path = os.path.join(os.path.dirname(__file__), ".","../save_results/results.txt")
     env_path = os.path.join(os.path.dirname(__file__), ".", "../save_results/env.txt")

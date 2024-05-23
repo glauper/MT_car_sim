@@ -68,12 +68,10 @@ while run_simulation:
     # Save the results
     if SimulationParam['With LLM car']:
         agents[str(len(agents))] = ego_vehicle
-        for id_vehicle, name_vehicle in enumerate(agents):
-            results = results_update_and_save(env, agents[name_vehicle], id_vehicle, results)
+        results = results_update_and_save(env, agents, results)
         agents.pop(str(len(agents) - 1))
     else:
-        for id_vehicle, name_vehicle in enumerate(agents):
-            results = results_update_and_save(env, agents[name_vehicle], id_vehicle, results)
+        results = results_update_and_save(env, agents, results)
 
     # This is a controller that optimize the trajectory of one agent at time
     other_agents = {}
@@ -220,7 +218,6 @@ while run_simulation:
 if SimulationParam['With LLM car']:
     agents[str(len(agents))] = ego_vehicle
 
-for id_vehicle, name_vehicle in enumerate(agents):
-    results = results_update_and_save(env, agents[name_vehicle], id_vehicle, results)
+results = results_update_and_save(env, agents, results)
 
 plot_simulation(SimulationParam['Environment'], env, results)
