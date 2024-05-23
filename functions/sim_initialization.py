@@ -89,6 +89,9 @@ def results_init(env, agents):
 
         results[f'agent {id_vehicle}']['x coord pred'] = []
         results[f'agent {id_vehicle}']['y coord pred'] = []
+        if agents[f'{id_vehicle}'].LLM_car:
+            results[f'agent {id_vehicle}']['x coord pred SF'] = []
+            results[f'agent {id_vehicle}']['y coord pred SF'] = []
 
     results_path = os.path.join(os.path.dirname(__file__), ".", "../save_results/results.txt")
     env_path = os.path.join(os.path.dirname(__file__), ".", "../save_results/env.txt")
@@ -109,6 +112,9 @@ def results_update_and_save(env, agents, results):
 
         results[f'agent {id_vehicle}']['x coord pred'].append(list(agents[name_vehicle].previous_opt_sol['X'][0,:]))
         results[f'agent {id_vehicle}']['y coord pred'].append(list(agents[name_vehicle].previous_opt_sol['X'][1,:]))
+        if agents[name_vehicle].LLM_car:
+            results[f'agent {id_vehicle}']['x coord pred SF'].append(list(agents[name_vehicle].previous_opt_sol_SF['X'][0,:]))
+            results[f'agent {id_vehicle}']['y coord pred SF'].append(list(agents[name_vehicle].previous_opt_sol_SF['X'][1,:]))
 
     results_path = os.path.join(os.path.dirname(__file__), ".","../save_results/results.txt")
     env_path = os.path.join(os.path.dirname(__file__), ".", "../save_results/env.txt")

@@ -124,25 +124,6 @@ class Vehicle:
         # Additional variables needed if you want to use the LLM with the car
         self.t_subtask = 0
 
-        """if query == 'go right':
-            self.right = {}
-            self.right['state'] = self.waypoints_exiting[0]
-            self.right['position'] = self.right['state'][0:2]
-            self.right['theta'] = self.right['state'][2]
-            self.right['velocity'] = self.right['state'][3]
-        elif query == 'go left':
-            self.left = {}
-            self.left['state'] = self.waypoints_exiting[0]
-            self.left['position'] = self.left['state'][0:2]
-            self.left['theta'] = self.left['state'][2]
-            self.left['velocity'] = self.left['state'][3]
-        elif query == 'go straight':
-            self.straight = {}
-            self.straight['state'] = self.waypoints_exiting[0]
-            self.straight['position'] = self.straight['state'][0:2]
-            self.straight['theta'] = self.straight['state'][2]
-            self.straight['velocity'] = self.straight['state'][3]"""
-
         self.entry = {}
         self.entry['state'] = self.target
         self.entry['position'] = self.entry['state'][0:2]
@@ -175,6 +156,8 @@ class Vehicle:
         # This needed for the optimization of MPC other vehicle
         self.previous_opt_sol['X'] = np.tile(self.state, (1, self.N + 1)).reshape(self.n, self.N + 1)
         self.previous_opt_sol['U'] = np.zeros((self.m, self.N))
+        self.previous_opt_sol_SF['X'] = np.tile(self.state, (1, self.N + 1)).reshape(self.n, self.N + 1)
+        self.previous_opt_sol_SF['U'] = np.zeros((self.m, self.N))
 
     def init_state(self, env, key_init):
         self.LLM_car = False

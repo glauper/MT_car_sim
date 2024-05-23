@@ -106,10 +106,10 @@ while run_simulation:
         else:
             # Check if necessary to have new Optimization Design
             if len(Language_Module.OD) == 0:
-                print('Call OD the first time')
+                print('Call OD the first time, for :', Language_Module.TP['tasks'][Language_Module.task_status])
                 Language_Module.call_OD(SimulationParam['Environment'], agents)
             elif ego_vehicle.t_subtask == 0:
-                print('Call OD')
+                print('Call OD for :', Language_Module.TP['tasks'][Language_Module.task_status])
                 Language_Module.recall_OD(SimulationParam['Environment'], agents)
 
             input_ego = ego_vehicle.MPC_LLM(agents, circular_obstacles, t, Language_Module)
