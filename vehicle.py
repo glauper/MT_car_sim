@@ -74,7 +74,8 @@ class Vehicle:
         state = np.zeros((4, 1))
         state[0:2, 0] = env['Ego Entrance']['position']
         state[2, 0] = env['Ego Entrance']['orientation'] * (np.pi / 180)  # form degrees in radiants
-        state[3, 0] = random.uniform(0, env['Ego Entrance']['speed limit'])
+        #state[3, 0] = random.uniform(0, env['Ego Entrance']['speed limit'])
+        state[3, 0] = 0
 
         if 'right' in query:
             key_target = '2'
@@ -474,7 +475,7 @@ class Vehicle:
         x_s = opti.variable(self.n, 1)
         u_s = opti.variable(self.m, 1)
 
-        opti.minimize(ca.norm_2(u_lernt - U[:, 0]) ** 2)
+        opti.minimize(ca.norm_2(u_lernt - U[:, 0]) ** 2 + ca.norm_2(x_s - self.previous_opt_sol['X'][:,-1]) ** 2)
 
         for k in range(self.N):
             # State and Input constraints

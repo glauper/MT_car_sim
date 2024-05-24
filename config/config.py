@@ -5,17 +5,17 @@ import json
 def SimulationConfig():
 
     SimulationParam = {'Save middle results': True,
-                       'With LLM car': True,
+                       'With LLM car': False,
                        'Timestep': 0.5, # [s]
-                       'Environment': 0,
-                       'Query': 'go to the exit on the right',
+                       'Environment': 5,
+                       'Query': 'go to the exit on the left',
                        'Controller': {
                            'Agents': {
                                'Type': "tracking MPC",
                                'Horizon': 20
                            },
                            'Ego': {
-                               'Active': False,
+                               'Active': True,
                                'Type': "safety filter",
                                'Horizon': 20
                            }

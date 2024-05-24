@@ -4,13 +4,13 @@ import pickle
 import random
 from config.config import SimulationConfig, EnviromentConfig
 from functions.plot_functions import plot_simulation
-from functions.sim_initialization import results_init, results_update_and_save, agents_init
+from functions.sim_initialization import results_update_and_save, sim_init, sim_reload
 from env_controller import EnvController
 from priority_controller import PriorityController
 from vehicle import Vehicle
 from llm import LLM
 
-SimulationParam = SimulationConfig()
+"""SimulationParam = SimulationConfig()
 delta_t = SimulationParam['Timestep']
 env, circular_obstacles = EnviromentConfig(SimulationParam['Environment'])
 env['env number'] = SimulationParam['Environment']
@@ -68,7 +68,10 @@ with open('reload_sim/ego_vehicle.pkl', 'wb') as file:
     pickle.dump(ego_vehicle, file)
 if SimulationParam['With LLM car']:
     with open('reload_sim/Language_Module.pkl', 'wb') as file:
-        pickle.dump(Language_Module, file)
+        pickle.dump(Language_Module, file)"""
+
+#SimulationParam, env, agents, ego_vehicle, Language_Module, presence_emergency_car, order_optimization, priority, results, circular_obstacles = sim_init()
+SimulationParam, env, agents, ego_vehicle, Language_Module, presence_emergency_car, order_optimization, priority, results, circular_obstacles = sim_reload()
 
 t = 0
 run_simulation = True

@@ -3,6 +3,136 @@ import random
 import os
 import json
 from vehicle import Vehicle
+import pickle
+from config.config import SimulationConfig, EnviromentConfig
+from priority_controller import PriorityController
+from vehicle import Vehicle
+from llm import LLM
+
+def sim_init():
+    SimulationParam = SimulationConfig()
+    delta_t = SimulationParam['Timestep']
+    env, circular_obstacles = EnviromentConfig(SimulationParam['Environment'])
+    env['env number'] = SimulationParam['Environment']
+    env['With LLM car'] = SimulationParam['With LLM car']
+
+    agents = agents_init(env, delta_t, SimulationParam)
+
+    presence_emergency_car = False
+    distance = []
+    for name_vehicle in agents:
+        if agents[name_vehicle].type == 'emergency_car':
+            presence_emergency_car = True
+            name_emergency_car = name_vehicle
+        else:
+            distance.append(np.linalg.norm(agents[name_vehicle].position))
+
+    order_optimization = list(agents.keys())
+    if presence_emergency_car:
+        order_optimization.remove(name_emergency_car)
+    pairs = list(zip(order_optimization, distance))
+    sorted_pairs = sorted(pairs, key=lambda x: x[1])
+    order_optimization = [pair[0] for pair in sorted_pairs]
+    if presence_emergency_car:
+        order_optimization.insert(0, name_emergency_car)
+
+    if SimulationParam['With LLM car']:
+        type = env['Vehicle Specification']['types'][0]
+        info_vehicle = env['Vehicle Specification'][type]
+        ego_vehicle = Vehicle(type, info_vehicle, delta_t)
+        ego_vehicle.init_system_constraints(env["State space"], env['Ego Entrance']['speed limit'])
+        ego_vehicle.init_state_for_LLM(env, SimulationParam['Query'], SimulationParam['Controller']['Ego']['Horizon'])
+    else:
+        ego_vehicle = []
+
+    priority = PriorityController(SimulationParam['Controller']['Agents']['Type'], SimulationParam['Environment'], env)
+
+    if SimulationParam['With LLM car']:
+        Language_Module = LLM()
+        Language_Module.call_TP(env, SimulationParam['Query'], agents, ego_vehicle)
+
+        agents[str(len(agents))] = ego_vehicle
+        results = results_init(env, agents)
+        agents.pop(str(len(agents) - 1))
+        options_entrance = list(env['Entrances'].keys())
+    else:
+        results = results_init(env, agents)
+        options_entrance = list(env['Entrances'].keys())
+
+    path = os.path.join(os.path.dirname(__file__), "..")
+    print(path)
+    # Save some info to eventually reload the simulation
+    with open(path + '/reload_sim/SimulationParam.pkl', 'wb') as file:
+        pickle.dump(SimulationParam, file)
+    with open(path + '/reload_sim/agents.pkl', 'wb') as file:
+        pickle.dump(agents, file)
+    with open(path + '/reload_sim/ego_vehicle.pkl', 'wb') as file:
+        pickle.dump(ego_vehicle, file)
+    if SimulationParam['With LLM car']:
+        with open(path + '/reload_sim/Language_Module.pkl', 'wb') as file:
+            pickle.dump(Language_Module, file)
+
+    if env['With LLM car']:
+        return SimulationParam, env, agents, ego_vehicle, Language_Module, presence_emergency_car, order_optimization, priority, results, circular_obstacles
+    else:
+        return SimulationParam, env, agents, ego_vehicle, [], presence_emergency_car, order_optimization, priority, results, circular_obstacles
+
+def sim_reload():
+
+    path = os.path.join(os.path.dirname(__file__), "..")
+    with open(path + '/reload_sim/SimulationParam.pkl', 'rb') as file:
+        SimulationParam = pickle.load(file)
+    with open(path + '/reload_sim/agents.pkl', 'rb') as file:
+        agents = pickle.load(file)
+    with open(path + '/reload_sim/ego_vehicle.pkl', 'rb') as file:
+        ego_vehicle = pickle.load(file)
+
+    if SimulationParam['With LLM car']:
+        with open(path + '/reload_sim/Language_Module.pkl', 'rb') as file:
+            Language_Module = pickle.load(file)
+
+        # If you want to change something, like SF acive or not
+        SimulationParam['Controller']['Ego']['Active'] = True
+
+    delta_t = SimulationParam['Timestep']
+    env, circular_obstacles = EnviromentConfig(SimulationParam['Environment'])
+    env['env number'] = SimulationParam['Environment']
+    env['With LLM car'] = SimulationParam['With LLM car']
+
+    presence_emergency_car = False
+    distance = []
+    for name_vehicle in agents:
+        if agents[name_vehicle].type == 'emergency_car':
+            presence_emergency_car = True
+            name_emergency_car = name_vehicle
+        else:
+            distance.append(np.linalg.norm(agents[name_vehicle].position))
+
+    order_optimization = list(agents.keys())
+    if presence_emergency_car:
+        order_optimization.remove(name_emergency_car)
+    pairs = list(zip(order_optimization, distance))
+    sorted_pairs = sorted(pairs, key=lambda x: x[1])
+    order_optimization = [pair[0] for pair in sorted_pairs]
+    if presence_emergency_car:
+        order_optimization.insert(0, name_emergency_car)
+
+    priority = PriorityController(SimulationParam['Controller']['Agents']['Type'], SimulationParam['Environment'], env)
+
+    if SimulationParam['With LLM car']:
+        agents[str(len(agents))] = ego_vehicle
+        results = results_init(env, agents)
+        agents.pop(str(len(agents) - 1))
+        options_entrance = list(env['Entrances'].keys())
+    else:
+        results = results_init(env, agents)
+        options_entrance = list(env['Entrances'].keys())
+
+    if env['With LLM car']:
+        return SimulationParam, env, agents, ego_vehicle, Language_Module, presence_emergency_car, order_optimization, priority, results, circular_obstacles
+    else:
+        return SimulationParam, env, agents, ego_vehicle, [], presence_emergency_car, order_optimization, priority, results, circular_obstacles
+
 
 def agents_init(env, delta_t, SimulationParam):
     agents = {}
@@ -92,6 +222,10 @@ def results_init(env, agents):
         if agents[f'{id_vehicle}'].LLM_car:
             results[f'agent {id_vehicle}']['x coord pred SF'] = []
             results[f'agent {id_vehicle}']['y coord pred SF'] = []
+            results[f'agent {id_vehicle}']['acc pred SF'] = []
+            results[f'agent {id_vehicle}']['acc pred LLM'] = []
+            results[f'agent {id_vehicle}']['steering angle pred SF'] = []
+            results[f'agent {id_vehicle}']['steering angle pred LLM'] = []
 
     results_path = os.path.join(os.path.dirname(__file__), ".", "../save_results/results.txt")
     env_path = os.path.join(os.path.dirname(__file__), ".", "../save_results/env.txt")
@@ -115,6 +249,10 @@ def results_update_and_save(env, agents, results):
         if agents[name_vehicle].LLM_car:
             results[f'agent {id_vehicle}']['x coord pred SF'].append(list(agents[name_vehicle].previous_opt_sol_SF['X'][0,:]))
             results[f'agent {id_vehicle}']['y coord pred SF'].append(list(agents[name_vehicle].previous_opt_sol_SF['X'][1,:]))
+            results[f'agent {id_vehicle}']['acc pred SF'].append(float(agents[name_vehicle].previous_opt_sol_SF['U'][0,0]))
+            results[f'agent {id_vehicle}']['acc pred LLM'].append(float(agents[name_vehicle].previous_opt_sol['U'][0,0]))
+            results[f'agent {id_vehicle}']['steering angle pred SF'].append(float(agents[name_vehicle].previous_opt_sol_SF['U'][1,0]))
+            results[f'agent {id_vehicle}']['steering angle pred LLM'].append(float(agents[name_vehicle].previous_opt_sol['U'][1,0]))
 
     results_path = os.path.join(os.path.dirname(__file__), ".","../save_results/results.txt")
     env_path = os.path.join(os.path.dirname(__file__), ".", "../save_results/env.txt")
