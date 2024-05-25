@@ -1,4 +1,5 @@
 import numpy as np
+import os
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.animation import FuncAnimation
@@ -24,6 +25,71 @@ def plot_input_LLM_and_SF(results):
 
     plt.show()
 
+
+def input_animation(results):
+    fig, ax1= plt.subplots()
+
+    time = np.arange(len(results[f'agent {str(len(results) - 1)}']['acc pred SF']))
+    acc_SF = results[f'agent {str(len(results)-1)}']['acc pred SF']
+    acc_LLM = results[f'agent {str(len(results) - 1)}']['acc pred LLM']
+
+    line1, = ax1.plot(time[0], acc_SF[0], color='orange')
+    line2, = ax1.plot(time[0], acc_LLM[0], color='red')
+
+    ax1.set_xlim(min(time) - 0.5, max(time) + 0.5)
+    ax1.set_ylim(min(min(acc_SF), min(acc_LLM)) - 0.5, max(max(acc_SF), max(acc_LLM)) + 0.5)
+
+    ax1.legend(['SF', 'LLM'])
+    ax1.set_xlabel('Time')
+    ax1.set_ylabel('[m/s^2]')
+    ax1.set_title('Acceleration')
+
+    def update1(frame):
+        line1.set_xdata(time[:frame])
+        line1.set_ydata(acc_SF[:frame])
+        line2.set_xdata(time[:frame])
+        line2.set_ydata(acc_LLM[:frame])
+        return line1, line2
+
+    # Create animations
+    ani1 = FuncAnimation(fig=fig, func=update1, frames=time, interval=100, blit=True, repeat=False)
+
+    path = os.path.join(os.path.dirname(__file__), "..")
+    ani1.save(path + '/animation/acc_input.gif', writer='pillow')
+    plt.show()
+
+    fig, ax2 = plt.subplots()
+
+    time = np.arange(len(results[f'agent {str(len(results) - 1)}']['acc pred SF']))
+    steering_SF = [x * 180 / np.pi for x in results[f'agent {str(len(results) - 1)}']['steering angle pred SF']]
+    steering_LLM = [x * 180 / np.pi for x in results[f'agent {str(len(results) - 1)}']['steering angle pred LLM']]
+
+    line3, = ax2.plot(time[0], steering_SF[0], color='orange')
+    line4, = ax2.plot(time[0], steering_LLM[0], color='red')
+
+    ax2.set_xlim(min(time)  - 0.5, max(time) + 0.5)
+    ax2.set_ylim(min(min(steering_SF), min(steering_LLM)) - 0.5, max(max(steering_SF), max(steering_LLM)) + 0.5)
+
+    ax2.legend(['SF', 'LLM'])
+    ax2.set_xlabel('Time')
+    ax2.set_ylabel('[deg]')
+    ax2.set_title('Steering angle')
+
+    def update2(frame):
+        line3.set_xdata(time[:frame])
+        line3.set_ydata(steering_SF[:frame])
+        line4.set_xdata(time[:frame])
+        line4.set_ydata(steering_LLM[:frame])
+
+        return line3, line4
+
+    ani2 = FuncAnimation(fig=fig, func=update2, frames=time, interval=100, blit=True, repeat=False)
+
+    path = os.path.join(os.path.dirname(__file__), "..")
+    ani2.save(path + '/animation/steering_input.gif', writer='pillow')
+
+    plt.show()
+
 def plot_vehicles(results, fig, ax, env, time):
     vehicles = {}
     labels = {}
@@ -32,9 +98,9 @@ def plot_vehicles(results, fig, ax, env, time):
             L = env['Vehicle Specification'][results[f'agent {id_agent}']['type']]['length']
             W = env['Vehicle Specification'][results[f'agent {id_agent}']['type']]['width']
             angle = results[f'agent {id_agent}']['theta'][0] * 180 / np.pi
-            if results[f'agent {id_agent}']['type'] == 'standard_car':
+            if results[f'agent {id_agent}']['type'] == 'standard car':
                 color = 'green'
-            elif results[f'agent {id_agent}']['type'] == 'emergency_car':
+            elif results[f'agent {id_agent}']['type'] == 'emergency car':
                 color = 'red'
             if id_agent != len(results) - 1:
                 vehicles[f'{id_agent}'] = patches.Rectangle(
@@ -107,6 +173,9 @@ def plot_vehicles(results, fig, ax, env, time):
 
     ani = FuncAnimation(fig=fig, func=update, frames=time, interval=100, repeat=False)
 
+    path = os.path.join(os.path.dirname(__file__), "..")
+    ani.save(path + '/animation/animation.gif', writer='pillow')
+
     return ani
 
 def plot_simulation(env_type, env, results):
@@ -154,7 +223,6 @@ def plot_simulation_env_0(env, results):
         ax.scatter(env['Exits'][id]['position'][0], env['Exits'][id]['position'][1], color='blue')
 
     ani = plot_vehicles(results, fig, ax, env, time)
-    ani.save('animation.gif', writer='pillow')
 
     ax.set_xlim(env["State space"]["x limits"][0], env["State space"]["x limits"][1])
     ax.set_ylim(env["State space"]["y limits"][0], env["State space"]["y limits"][1])
@@ -195,7 +263,6 @@ def plot_simulation_env_1(env, results):
         plt.scatter(env['Exits'][id]['position'][0], env['Exits'][id]['position'][1], color='blue')
 
     ani = plot_vehicles(results, fig, ax, env, time)
-    ani.save('animation.gif', writer='pillow')
 
     ax.set_xlim(env["State space"]["x limits"][0], env["State space"]["x limits"][1])
     ax.set_ylim(env["State space"]["y limits"][0], env["State space"]["y limits"][1])
@@ -235,7 +302,6 @@ def plot_simulation_env_2(env, results):
         plt.scatter(env['Exits'][id]['position'][0], env['Exits'][id]['position'][1], color='blue')
 
     ani = plot_vehicles(results, fig, ax, env, time)
-    ani.save('animation.gif', writer='pillow')
 
     ax.set_xlim(env["State space"]["x limits"][0], env["State space"]["x limits"][1])
     ax.set_ylim(env["State space"]["y limits"][0], env["State space"]["y limits"][1])
@@ -271,7 +337,6 @@ def plot_simulation_env_3(env, results):
         plt.scatter(env['Exits'][id]['position'][0], env['Exits'][id]['position'][1], color='blue')
 
     ani = plot_vehicles(results, fig, ax, env, time)
-    ani.save('animation.gif', writer='pillow')
 
     ax.set_xlim(env["State space"]["x limits"][0], env["State space"]["x limits"][1])
     ax.set_ylim(env["State space"]["y limits"][0], env["State space"]["y limits"][1])
@@ -307,7 +372,6 @@ def plot_simulation_env_4(env, results):
         plt.scatter(env['Exits'][id]['position'][0], env['Exits'][id]['position'][1], color='blue')
 
     ani = plot_vehicles(results, fig, ax, env, time)
-    ani.save('animation.gif', writer='pillow')
 
     ax.set_xlim(env["State space"]["x limits"][0], env["State space"]["x limits"][1])
     ax.set_ylim(env["State space"]["y limits"][0], env["State space"]["y limits"][1])
@@ -347,7 +411,6 @@ def plot_simulation_env_5(env, results):
         plt.scatter(env['Exits'][id]['position'][0], env['Exits'][id]['position'][1], color='blue')
 
     ani = plot_vehicles(results, fig, ax, env, time)
-    ani.save('animation.gif', writer='pillow')
 
     ax.set_xlim(env["State space"]["x limits"][0], env["State space"]["x limits"][1])
     ax.set_ylim(env["State space"]["y limits"][0], env["State space"]["y limits"][1])

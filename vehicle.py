@@ -67,9 +67,10 @@ class Vehicle:
                             env['Exits'][exit]['waypoints'][point][1] == self.target[1]):
                         self.b_x[6, 0] = env['Exits'][exit]['speed limit']
 
-    def init_state_for_LLM(self, env, query, N):
+    def init_state_for_LLM(self, env, query, N, N_SF):
         self.LLM_car = True
         self.N = N
+        self.N_SF = N_SF
 
         state = np.zeros((4, 1))
         state[0:2, 0] = env['Ego Entrance']['position']
@@ -298,7 +299,7 @@ class Vehicle:
         # Terminal constraints
         opti.subject_to(X[:, -1] == x_s)  # x(N) == x_s
 
-        # Aviodance of other agents
+        # Avoidance of other agents
         if nr_agents >= 1:
             for k in range(self.N + 1):
                 for other_agent in other_agents:
@@ -319,7 +320,7 @@ class Vehicle:
                 else:
                     opti.subject_to(ca.transpose(diff) @ diff >= ego.security_dist ** 2 + epsilon)
 
-        # Obstacle aviodance
+        # Obstacle avoidance
         if len(circular_obstacles) != 0:
             for id_obst in circular_obstacles:
                 for k in range(self.N + 1):
@@ -470,14 +471,14 @@ class Vehicle:
 
         opti = ca.Opti()
 
-        X = opti.variable(self.n, self.N + 1)
-        U = opti.variable(self.m, self.N)
+        X = opti.variable(self.n, self.N_SF + 1)
+        U = opti.variable(self.m, self.N_SF)
         x_s = opti.variable(self.n, 1)
         u_s = opti.variable(self.m, 1)
 
         opti.minimize(ca.norm_2(u_lernt - U[:, 0]) ** 2 + ca.norm_2(x_s - self.previous_opt_sol['X'][:,-1]) ** 2)
 
-        for k in range(self.N):
+        for k in range(self.N_SF):
             # State and Input constraints
             opti.subject_to(self.A_x @ X[:, k + 1] <= self.b_x)
             opti.subject_to(self.A_u @ U[:, k] <= self.b_u)
@@ -490,7 +491,7 @@ class Vehicle:
 
         # Agents avoidance
         if len(agents) >= 1:
-            for k in range(self.N + 1):
+            for k in range(self.N_SF + 1):
                 for id_agent in agents:
                     if agents[id_agent].security_dist != 0:
                         diff = X[0:2, k] - agents[id_agent].position
@@ -503,7 +504,7 @@ class Vehicle:
         # Obstacle avoidance
         if len(circular_obstacles) != 0:
             for id_obst in circular_obstacles:
-                for k in range(self.N + 1):
+                for k in range(self.N_SF + 1):
                     diff_x = (X[0, k] - circular_obstacles[id_obst]['center'][0]) ** 2 / (circular_obstacles[id_obst]['r_x']) ** 2
                     diff_y = (X[1, k] - circular_obstacles[id_obst]['center'][1]) ** 2 / (circular_obstacles[id_obst]['r_y']) ** 2
                     opti.subject_to(diff_x + diff_y >= 1)
@@ -516,8 +517,8 @@ class Vehicle:
         opti.subject_to(X[:, -1] == x_s)  # x(N) == x_s
         # Solve the optimization problem
         if t == 0:  # or agents[f'{i}'].target_status
-            opti.set_initial(X, np.tile(self.state, (1, self.N + 1)).reshape(self.n, self.N + 1))
-            opti.set_initial(U, np.zeros((self.m, self.N)))
+            opti.set_initial(X, np.tile(self.state, (1, self.N_SF + 1)).reshape(self.n, self.N_SF + 1))
+            opti.set_initial(U, np.zeros((self.m, self.N_SF)))
             opti.set_initial(x_s, self.state)
             opti.set_initial(u_s, np.zeros((self.m, 1)))
 

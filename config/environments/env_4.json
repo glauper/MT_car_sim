@@ -53,7 +53,7 @@
 		},
 
 	"Vehicle Specification": {
-		"types": ["standard_car", "emergency_car"],
+		"types": ["standard car", "emergency car"],
 		"standard_car": {
 			"length": 3,
 			"width": 2,

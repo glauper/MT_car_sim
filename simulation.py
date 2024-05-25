@@ -70,8 +70,8 @@ if SimulationParam['With LLM car']:
     with open('reload_sim/Language_Module.pkl', 'wb') as file:
         pickle.dump(Language_Module, file)"""
 
-#SimulationParam, env, agents, ego_vehicle, Language_Module, presence_emergency_car, order_optimization, priority, results, circular_obstacles = sim_init()
-SimulationParam, env, agents, ego_vehicle, Language_Module, presence_emergency_car, order_optimization, priority, results, circular_obstacles = sim_reload()
+SimulationParam, env, agents, ego_vehicle, Language_Module, presence_emergency_car, order_optimization, priority, results, circular_obstacles = sim_init()
+#SimulationParam, env, agents, ego_vehicle, Language_Module, presence_emergency_car, order_optimization, priority, results, circular_obstacles = sim_reload()
 
 t = 0
 run_simulation = True
@@ -128,7 +128,7 @@ while run_simulation:
                 Language_Module.recall_OD(SimulationParam['Environment'], agents)
 
             input_ego = ego_vehicle.MPC_LLM(agents, circular_obstacles, t, Language_Module)
-            if SimulationParam['Controller']['Ego']['Active']:
+            if SimulationParam['Controller']['Ego']['SF']['Active']:
                 input_ego = ego_vehicle.SF(input_ego, agents, circular_obstacles, t)
                 print('Cost SF ', ego_vehicle.previous_opt_sol_SF['Cost'])
 
@@ -189,21 +189,6 @@ while run_simulation:
         agents[name_agent].update_velocity_limits(env)
 
     if SimulationParam['With LLM car']:
-        """if next_task:
-            ego_vehicle.t_subtask = 0
-            Language_Module.task_status += 1
-
-        if Language_Module.task_status >= len(Language_Module.TP['tasks']):
-            if np.linalg.norm(ego_vehicle.position - ego_vehicle.final_target['position']) <= 1:
-                # Questo si potrebbe spostare a prima
-                print('End simulation: because the position of LLM car is near enough to the the final target.')
-                run_simulation = False
-            elif ego_vehicle.entering == False and ego_vehicle.exiting == False:
-                print('End simulation: because entering and exiting flags are false.')
-                run_simulation = False
-            else:
-                print('End simulation: because there are no more tasks in the TP.')
-                run_simulation = False"""
         if run_simulation:
             if next_task:
                 ego_vehicle.t_subtask = 0
@@ -211,7 +196,7 @@ while run_simulation:
                 print('Call TP: because a task is terminated and a new one begins.')
                 Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, {'next_task': True, 'SF_kicks_in': False})
                 # If safety filter have to correct then we need to replan...how to proceed?
-            elif SimulationParam['Controller']['Ego']['Active'] and ego_vehicle.previous_opt_sol_SF['Cost'] >= 10:
+            elif SimulationParam['Controller']['Ego']['SF']['Active'] and ego_vehicle.previous_opt_sol_SF['Cost'] >= 10:
                 ego_vehicle.t_subtask = 0
                 print('Call TP: because SF cost are high')
                 Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, {'next_task': False, 'SF_kicks_in': True})

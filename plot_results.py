@@ -3,7 +3,7 @@ import os
 import json
 import random
 from config.config import SimulationConfig, EnviromentConfig
-from functions.plot_functions import plot_simulation, plot_input_LLM_and_SF
+from functions.plot_functions import plot_simulation, plot_input_LLM_and_SF, input_animation
 from env_controller import EnvController
 from vehicle import Vehicle
 
@@ -19,4 +19,5 @@ env = json.loads(file_content)
 
 plot_simulation(env['env number'], env, results)
 if env['With LLM car']:
-    plot_input_LLM_and_SF(results)
+    #plot_input_LLM_and_SF(results)
+    input_animation(results)

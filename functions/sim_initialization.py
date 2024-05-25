@@ -41,7 +41,7 @@ def sim_init():
         info_vehicle = env['Vehicle Specification'][type]
         ego_vehicle = Vehicle(type, info_vehicle, delta_t)
         ego_vehicle.init_system_constraints(env["State space"], env['Ego Entrance']['speed limit'])
-        ego_vehicle.init_state_for_LLM(env, SimulationParam['Query'], SimulationParam['Controller']['Ego']['Horizon'])
+        ego_vehicle.init_state_for_LLM(env, SimulationParam['Query'], SimulationParam['Controller']['Ego']['LLM']['Horizon'], SimulationParam['Controller']['Ego']['SF']['Horizon'])
     else:
         ego_vehicle = []
 
@@ -92,7 +92,7 @@ def sim_reload():
             Language_Module = pickle.load(file)
 
         # If you want to change something, like SF acive or not
-        SimulationParam['Controller']['Ego']['Active'] = True
+        SimulationParam['Controller']['Ego']['SF']['Active'] = True
 
     delta_t = SimulationParam['Timestep']
     env, circular_obstacles = EnviromentConfig(SimulationParam['Environment'])
