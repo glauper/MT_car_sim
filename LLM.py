@@ -46,7 +46,7 @@ class LLM:
             motivation = """You have to replan because the task '""" + self.TP['tasks'][self.task_status-1] + """' is finished. In the next the description of the actual situation.
         """
         elif why['SF_kicks_in']:
-            motivation = """The execution of the task '""" + self.TP['tasks'][self.task_status-1] + """' is not completed, but you have to replan to ensure that the task can be continued. In the next the description of the actual situation.
+            motivation = """The execution of the task '""" + self.TP['tasks'][self.task_status] + """' is not completed, but you have to replan to ensure that the task can be continued. In the next the description of the actual situation.
         """
 
         description = specific_TP_prompt(env_nr, agents, ego, query)

@@ -24,44 +24,46 @@ class PriorityController:
         self.b_p = b
 
 
-    def NoPriority(self, agents):
+    def NoPriority(self, agents, order_optimization, ego):
 
-        # Check if any agents have reach a target and change it in case
-        for id_vehicle in range(self.env['Number Vehicles']):
-            distance_target = np.linalg.norm(agents[f'{id_vehicle}'].position - agents[f'{id_vehicle}'].target[0:2])
-            if len(agents[f'{id_vehicle}'].waypoints_entering) != 0 and distance_target <= 1:
-                agents[f'{id_vehicle}'].target = agents[f'{id_vehicle}'].waypoints_entering.pop(0)
-            elif len(agents[f'{id_vehicle}'].waypoints_entering) == 0 and len(agents[f'{id_vehicle}'].waypoints_exiting) != 0 and distance_target <= 1:
-                agents[f'{id_vehicle}'].target = agents[f'{id_vehicle}'].waypoints_exiting.pop(0)
-                agents[f'{id_vehicle}'].exiting = True
-                agents[f'{id_vehicle}'].entering = False
-            elif len(agents[f'{id_vehicle}'].waypoints_exiting) == 0 and distance_target <= 1:
-                options_entrance = list(self.env['Entrances'].keys())
-                key_init = random.choice(options_entrance)
-                agents[f'{id_vehicle}'].init_state(self.env, key_init)
-                flag = True
-                while flag:
-                    checks = []
-                    for id_other_vehicle in range(self.env['Number Vehicles']):
-                        if id_vehicle != id_other_vehicle:
-                            dist = np.linalg.norm(
-                                agents[f'{id_vehicle}'].position - agents[f'{id_other_vehicle}'].position)
-                            if dist <= max(agents[f'{id_other_vehicle}'].security_dist,
-                                           agents[f'{id_vehicle}'].security_dist):
-                                checks.append(False)
-                                options_entrance.remove(key_init)
-                                key_init = random.choice(options_entrance)
-                                agents[f'{id_vehicle}'].init_state(self.env, key_init)
-                                # Change the type of vehicle!
-                            else:
-                                checks.append(True)
-                    if all(checks) == True:
-                        flag = False
-                    else:
-                        flag = True
+        ids_entering = []
+        ids_exiting = []
+        for id_agent in range(len(agents)):
+            if agents[f'{id_agent}'].entering:
+                ids_entering.append(f'{id_agent}')
+            elif agents[f'{id_agent}'].exiting:
+                ids_exiting.append(f'{id_agent}')
 
-                agents[f'{id_vehicle}'].exiting = False
-                agents[f'{id_vehicle}'].entering = True
+            if all(self.A_p @ agents[f'{id_agent}'].position <= self.b_p):
+                agents[f'{id_agent}'].inside_cross = True
+            else:
+                agents[f'{id_agent}'].inside_cross = False
+
+        for id_agent in ids_entering:
+            dist_own_target = np.linalg.norm(
+                agents[id_agent].position - agents[id_agent].target[0:2])
+            if dist_own_target <= 1:
+                agents[id_agent].target = agents[id_agent].waypoints_exiting.pop(0)
+                agents[id_agent].exiting = True
+                agents[id_agent].entering = False
+                if ego:
+                    if id_agent != str(len(agents) - 1):
+                        order_optimization.remove(id_agent)
+                        order_optimization.insert(len(ids_exiting), id_agent)
+                else:
+                    order_optimization.remove(id_agent)
+                    order_optimization.insert(len(ids_exiting), id_agent)
+
+        for id_agent in ids_exiting:
+            distance_target = np.linalg.norm(agents[id_agent].position - agents[id_agent].target[0:2])
+            if len(agents[id_agent].waypoints_entering) != 0 and distance_target <= 1:
+                agents[id_agent].target = agents[id_agent].waypoints_entering.pop(0)
+            elif len(agents[id_agent].waypoints_exiting) != 0 and distance_target <= 1:
+                agents[id_agent].target = agents[id_agent].waypoints_exiting.pop(0)
+            elif len(agents[id_agent].waypoints_exiting) == 0 and distance_target <= 1:
+                agents[id_agent].exiting = False
+                agents[id_agent].entering = False
+                agents[id_agent].security_dist = 0
 
         return agents
 
@@ -126,13 +128,9 @@ class PriorityController:
                         agents[id_priority_vehicle].entering = False
                         if ego:
                             if id_priority_vehicle != str(len(agents)-1):
-                                print(id_priority_vehicle)
-                                print(str(len(agents)))
                                 order_optimization.remove(id_priority_vehicle)
                                 order_optimization.insert(len(ids_exiting), id_priority_vehicle)
                         else:
-                            print(id_priority_vehicle)
-                            print(str(len(agents)))
                             order_optimization.remove(id_priority_vehicle)
                             order_optimization.insert(len(ids_exiting), id_priority_vehicle)
                 else:
@@ -143,13 +141,9 @@ class PriorityController:
                         agents[id_priority_vehicle].entering = False
                         if ego:
                             if id_priority_vehicle != str(len(agents) - 1):
-                                print(id_priority_vehicle)
-                                print(str(len(agents)))
                                 order_optimization.remove(id_priority_vehicle)
                                 order_optimization.insert(len(ids_exiting), id_priority_vehicle)
                         else:
-                            print(id_priority_vehicle)
-                            print(str(len(agents)))
                             order_optimization.remove(id_priority_vehicle)
                             order_optimization.insert(len(ids_exiting), id_priority_vehicle)
 

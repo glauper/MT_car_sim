@@ -17,7 +17,11 @@ def SimulationConfig():
                            'Ego': {
                                'SF': {
                                    'Active': True,
-                                   'Horizon': 20
+                                   'Horizon': 20,
+                                   'Replan': {
+                                       'Active': False,
+                                       'toll': 5
+                                   }
                                },
                                'LLM': {
                                    'Horizon': 20

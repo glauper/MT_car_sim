@@ -116,6 +116,8 @@ while run_simulation:
                             next_task = False
                         else:
                             next_task = True
+                if ego_vehicle.t_subtask > 30:
+                    next_task = True
             elif abs(ego_vehicle.velocity) <= 0.01:
                 next_task = True
         else:
@@ -155,6 +157,7 @@ while run_simulation:
         # Dynamics propagation
         if ego_brake:
             ego_vehicle.brakes()
+
         else:
             ego_vehicle.dynamics_propagation(input_ego)
 
@@ -179,7 +182,8 @@ while run_simulation:
         ego_vehicle.t_subtask += 1
         # I don't think is the best way to do that...
         agents[str(len(agents))] = ego_vehicle
-        agents = priority.SwissPriority(agents, order_optimization, SimulationParam['With LLM car'])
+        #agents = priority.SwissPriority(agents, order_optimization, SimulationParam['With LLM car'])
+        agents = priority.NoPriority(agents, order_optimization, SimulationParam['With LLM car'])
         ego_vehicle = agents.pop(str(len(agents)-1))
     else:
         agents = priority.SwissPriority(agents, order_optimization, SimulationParam['With LLM car'])
@@ -196,7 +200,7 @@ while run_simulation:
                 print('Call TP: because a task is terminated and a new one begins.')
                 Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, {'next_task': True, 'SF_kicks_in': False})
                 # If safety filter have to correct then we need to replan...how to proceed?
-            elif SimulationParam['Controller']['Ego']['SF']['Active'] and ego_vehicle.previous_opt_sol_SF['Cost'] >= 10:
+            elif SimulationParam['Controller']['Ego']['SF']['Replan']['Active'] and ego_vehicle.previous_opt_sol_SF['Cost'] >= SimulationParam['Controller']['Ego']['SF']['Replan']['toll']:
                 ego_vehicle.t_subtask = 0
                 print('Call TP: because SF cost are high')
                 Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, {'next_task': False, 'SF_kicks_in': True})

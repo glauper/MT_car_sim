@@ -358,7 +358,6 @@ class Vehicle:
         self.previous_opt_sol['u_s'] = sol.value(u_s)
         self.previous_opt_sol['Cost'] = sol.value(cost)
 
-
         input = sol.value(U)[:, 0].reshape((self.m, 1))
 
         if self.state[2] > 0 and self.target[2] < 0:
@@ -369,6 +368,17 @@ class Vehicle:
                 self.target[2] += 2 * np.pi
 
         return input
+
+    def trajecotry_estimation(self):
+        input = np.zeros((2,1))
+        self.traj_estimation = np.zeros((self.n, self.N_SF))
+        self.traj_estimation[:, 0] = self.state
+        for k in range(self.N_SF):
+            beta = np.arctan(self.l_r / (self.l_r + self.l_f) * np.tan(input[1]))
+            self.traj_estimation[0, k+1] = self.traj_estimation[0, k] + self.delta_t * self.traj_estimation[3, k] * np.cos(self.traj_estimation[2, k] + beta)
+            self.traj_estimation[1, k+1] = self.traj_estimation[1, k] + self.delta_t * self.traj_estimation[3, k] * np.sin(self.traj_estimation[2, k] + beta)
+            self.traj_estimation[2, k+1] = self.traj_estimation[2, k] + self.delta_t * self.traj_estimation[3, k] / self.l_r * np.sin(beta)
+            self.traj_estimation[3, k+1] = self.traj_estimation[3, k] + self.delta_t * input[0]
 
     def MPC_LLM(self, agents, circular_obstacles, t, llm):
 
@@ -394,7 +404,7 @@ class Vehicle:
         # Initial state
         opti.subject_to(X[:, 0] == self.state)
 
-        # Agents avoidance
+        """# Agents avoidance
         if len(agents) >= 1:
             for k in range(self.N + 1):
                 for id_agent in agents:
@@ -403,7 +413,7 @@ class Vehicle:
                     if self.security_dist >= agents[id_agent].security_dist:
                         opti.subject_to(ca.transpose(diff) @ diff >= self.security_dist ** 2)
                     else:
-                        opti.subject_to(ca.transpose(diff) @ diff >= agents[id_agent].security_dist ** 2)
+                        opti.subject_to(ca.transpose(diff) @ diff >= agents[id_agent].security_dist ** 2)"""
 
         # Obstacle avoidance
         if len(circular_obstacles) != 0:
@@ -476,7 +486,8 @@ class Vehicle:
         x_s = opti.variable(self.n, 1)
         u_s = opti.variable(self.m, 1)
 
-        opti.minimize(ca.norm_2(u_lernt - U[:, 0]) ** 2 + ca.norm_2(x_s - self.previous_opt_sol['X'][:,-1]) ** 2)
+        #opti.minimize(ca.norm_2(u_lernt - U[:, 0]) ** 2 + ca.norm_2(x_s - self.previous_opt_sol['X'][:,-1]) ** 2)
+        opti.minimize(ca.norm_2(u_lernt - U[:, 0]) ** 2)
 
         for k in range(self.N_SF):
             # State and Input constraints
@@ -497,10 +508,9 @@ class Vehicle:
                         diff = X[0:2, k] - agents[id_agent].position
                         # Which of the distance have to keep? mine or of the other one? Or one standard for all
                         if self.security_dist >= agents[id_agent].security_dist:
-                            opti.subject_to(ca.transpose(diff) @ diff >= self.security_dist ** 2)
+                            opti.subject_to(ca.transpose(diff) @ diff >= (self.security_dist) ** 2 )
                         else:
-                            opti.subject_to(ca.transpose(diff) @ diff >= agents[id_agent].security_dist ** 2)
-
+                            opti.subject_to(ca.transpose(diff) @ diff >= (agents[id_agent].security_dist) ** 2)
         # Obstacle avoidance
         if len(circular_obstacles) != 0:
             for id_obst in circular_obstacles:
@@ -515,18 +525,23 @@ class Vehicle:
         opti.subject_to(self.dynamics_constraints(x_s, x_s, u_s))
         # Terminal constraints
         opti.subject_to(X[:, -1] == x_s)  # x(N) == x_s
+
+        opti.minimize(cost)
+
         # Solve the optimization problem
         if t == 0:  # or agents[f'{i}'].target_status
             opti.set_initial(X, np.tile(self.state, (1, self.N_SF + 1)).reshape(self.n, self.N_SF + 1))
             opti.set_initial(U, np.zeros((self.m, self.N_SF)))
             opti.set_initial(x_s, self.state)
             opti.set_initial(u_s, np.zeros((self.m, 1)))
+            opti.set_initial(epsilon, 0)
 
         else:
             opti.set_initial(X, self.previous_opt_sol_SF['X'])
             opti.set_initial(U, self.previous_opt_sol_SF['U'])
             opti.set_initial(x_s, self.previous_opt_sol_SF['x_s'])
             opti.set_initial(u_s, self.previous_opt_sol_SF['u_s'])
+            opti.set_initial(epsilon, 0)
 
         opti.solver('ipopt')
         sol = opti.solve()

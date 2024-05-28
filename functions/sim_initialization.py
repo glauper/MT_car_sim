@@ -91,7 +91,7 @@ def sim_reload():
         with open(path + '/reload_sim/Language_Module.pkl', 'rb') as file:
             Language_Module = pickle.load(file)
 
-        # If you want to change something, like SF acive or not
+        # If you want to change something, like SF active or not
         SimulationParam['Controller']['Ego']['SF']['Active'] = True
 
     delta_t = SimulationParam['Timestep']

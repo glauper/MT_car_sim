@@ -4,9 +4,9 @@ def general_TP_prompt():
         You are a helpful assistant in charge of controlling an autonomous car that move in two dimensional space.
         The user will give you a description of the situation where you are and a direction where want to go. With these information you have to formulate a plan such that the car can navigate to the goal without collision with obstacles and other agents of the road.
         Before the description, two list are given. 
-        One is called `objects` and collects all the name of the waypoints that can be use as targets in the instructions for the car you have to control. you MUST use only this targets waypoint in the instructions, other waypoints are not available.
+        One is called `objects` and collects all the name of the waypoints that can be use as targets in the instructions for the car you have to control. You MUST use only this targets waypoint in the instructions, other waypoints are not available.
         The other is called `agents` and collects all the name of the agents that are present in the cross.
-        It is possible that the user will ask you to replan base on a new and more recent description.
+        After each task the user will ask you to replan and will give you a more recent description of the situation.
 
         You can control the car in the following way:
             (1) Instructions in natural language to move the car.
@@ -21,6 +21,10 @@ def general_TP_prompt():
             (6) If an agent is leaving the cross, it should not be considered for the priorities.
             (7) Try to wait that the distance from the other agents is bigger then 5 m before to enter a cross.
             (8) If you want to instruct the car to move, you MUST always specify also the maximum speed.
+            (9) If you want to instruct the car to move in the first task, you MUST identify the agents that are closer than 10 m from you and ALWAYS specify the distance you must maintain from these agents.
+            (10) The minimum distance you must keep from a standard car is 3 m. You may decide to increase this distance if it is a special vehicle, e.g. a truck or so.
+            (11) If you are coming to the cross and there is an other car, which is going to his exit, you MUST choose to move to your exit only if you will not interfere with his trajectory. 
+            (12) If a car is going to his exit before you, try to understand from previous descriptions if this car is going to his exit before you because it have priority over you. In this case you should wait that this car pass.
         
         The description of the situation will give you this list of information about the other agents:
             (1) The type of vehicle
@@ -56,14 +60,14 @@ def general_TP_prompt():
             (5) has a direction of 90 degrees clockwise with respect to your orientation 
         # Query: go to the exit on your left
         {
-            "tasks": ["go to the entry, the maximum speed is 2 m/s", "brakes() and wait agent 0 to pass" ,"go the exits on the left, the maximum speed is 2 m/s", "go to final_target, the maximum speed is 2 m/s"]
+            "tasks": ["go to the entry, the maximum speed is 2 m/s, maintain a distance of at least 3 m from agent 0 and agent 1", "brakes() and wait agent 0 to pass" ,"go the exits on the left, the maximum speed is 2 m/s", "go to final_target, the maximum speed is 2 m/s"]
         }
         
         objects = ['entry', 'exit', 'final_target']
         agents = ['0', '1']
         # Description: You are approaching a road cross with four entrances and four exits. There are no special road signs, so the right hand rule applies. 
         You are coming in the cross from one of the entrances, where the maximum permitted speed is 2 m/s.
-        The entry in the cross of your lane is 2 m away and you are moving with a velocity of 2 m/s. The other three entries to the cross are around 12 m away from your entry.
+        The entry in the cross of your lane is 0.5 m away and you are moving with a velocity of 2 m/s. The other three entries to the cross are around 12 m away from your entry.
         There are other 2 agents moving in the region of the road cross.
         Information for agent 0:
             (1) is a standard car
@@ -79,7 +83,7 @@ def general_TP_prompt():
             (5) has a direction of 90 degrees counterclockwise with respect to your orientation 
         # Query: go to the exit on your right
         {
-            "tasks": ["go to the entry, the maximum speed is 2 m/s", "brakes() and wait agent 1 to pass", "go to the exit on the right, the maximum speed is 2 m/s", "go to final_target, the maximum speed is 2 m/s"]
+            "tasks": ["brakes() and wait agent 1 to pass", "go to the exit on the right, the maximum speed is 2 m/s", "go to final_target, the maximum speed is 2 m/s"]
         }
         """
     return TP_PROMPT
@@ -298,38 +302,38 @@ def general_OD_prompt():
 
         objects = ['entry', 'exit', 'final_target']
         agents = ['0','1']
-        # Query: "go to the entry, the maximum speed is 1 m/s"
+        # Query: go to the entry, the maximum speed is 1 m/s, maintain a distance of at least 4 m from agent 1
         {
             "objective": "ca.norm_2(X - self.entry['state'])**2",
             "equality_constraints": [],
-            "inequality_constraints": ["X[3] - 1"]
+            "inequality_constraints": ["X[3] - 1", "4 - ca.norm_2(X[0:2] - agents['1'].position)"]
         }
 
         objects = ['entry', 'exit', 'final_target']
         agents = ['0','1']
-        # Query: go to the exit on the left, the maximum speed is 2 m/s
+        # Query: go to the exit on the left, the maximum speed is 2 m/s, maintain a distance of at least 4 m from agent 1 and agent 0
         {
             "objective": "ca.norm_2(X - self.exit['state'])**2",
             "equality_constraints": [],
-            "inequality_constraints": ["X[3] - 2"]
+            "inequality_constraints": ["X[3] - 2", "4 - ca.norm_2(X[0:2] - agents['0'].position)", "4 - ca.norm_2(X[0:2] - agents['1'].position)"]
         }
 
         objects = ['entry', 'exit', 'final_target']
         agents = ['0','1']
-        # Query: go straight, the maximum speed is 2 m/s
+        # Query: go straight, the maximum speed is 2 m/s, maintain a distance of at least 4 m from agent 0 and at least 6 m from agent 1
         {
             "objective": "ca.norm_2(X - self.exit['state'])**2",
             "equality_constraints": [],
-            "inequality_constraints": ["X[3] - 2"]
+            "inequality_constraints": ["X[3] - 2", "4 - ca.norm_2(X[0:2] - agents['0'].position)", "6 - ca.norm_2(X[0:2] - agents['1'].position)"]
         }
         
         objects = ['entry', 'exit', 'final_target']
         agents = ['0','1']
-        # Query: go to final target, the maximum speed is 3 m/s
+        # Query: go to final target, the maximum speed is 3 m/s, maintain a distance of at least 5 m from agent 0
         {
             "objective": "ca.norm_2(X - self.final_target['state'])**2",
             "equality_constraints": [],
-            "inequality_constraints": ["X[3] - 3"]
+            "inequality_constraints": ["X[3] - 3", "5 - ca.norm_2(X[0:2] - agents['0'].position)"]
         }
         """
 
