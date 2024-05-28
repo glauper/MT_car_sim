@@ -19,8 +19,8 @@ def SimulationConfig():
                                    'Active': True,
                                    'Horizon': 20,
                                    'Replan': {
-                                       'Active': False,
-                                       'toll': 5
+                                       'Active': True,
+                                       'toll': 10
                                    }
                                },
                                'LLM': {

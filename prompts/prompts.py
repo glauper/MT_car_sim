@@ -21,7 +21,7 @@ def general_TP_prompt():
             (6) If an agent is leaving the cross, it should not be considered for the priorities.
             (7) Try to wait that the distance from the other agents is bigger then 5 m before to enter a cross.
             (8) If you want to instruct the car to move, you MUST always specify also the maximum speed.
-            (9) If you want to instruct the car to move in the first task, you MUST identify the agents that are closer than 10 m from you and ALWAYS specify the distance you must maintain from these agents.
+            (9) If you want to instruct the car to move in the first task, you MUST identify the agents that are closer than 10 m from you and ALWAYS specify the distance you must maintain from these agents. For the other agents more away then 10 you can decide if to specify the security distance.
             (10) The minimum distance you must keep from a standard car is 3 m. You may decide to increase this distance if it is a special vehicle, e.g. a truck or so.
             (11) If you are coming to the cross and there is an other car, which is going to his exit, you MUST choose to move to your exit only if you will not interfere with his trajectory. 
             (12) If a car is going to his exit before you, try to understand from previous descriptions if this car is going to his exit before you because it have priority over you. In this case you should wait that this car pass.

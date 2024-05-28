@@ -3,7 +3,7 @@ import os
 import json
 import random
 from config.config import SimulationConfig, EnviromentConfig
-from functions.plot_functions import plot_simulation, plot_input_LLM_and_SF, input_animation
+from functions.plot_functions import input_animation, plot_simulation
 from env_controller import EnvController
 from vehicle import Vehicle
 

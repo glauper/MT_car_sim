@@ -2,7 +2,7 @@ import numpy as np
 import os
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-from matplotlib.animation import FuncAnimation
+from matplotlib.animation import FuncAnimation, FFMpegWriter
 
 def plot_input_LLM_and_SF(results):
     time = np.arange(len(results[f'agent {str(len(results)-1)}']['acc pred SF']))
@@ -129,13 +129,18 @@ def plot_vehicles(results, fig, ax, env, time):
     lines = {}
     # scats = {}
     for k in range(len(results)):
-        lines[f'line{k}'] = \
-        ax.plot(results[f'agent {k}']['x coord pred'][0], results[f'agent {k}']['y coord pred'][0], c="red",
-                linestyle='--')[0]  # label=f'v0 = {v02} m/s'
         if env['With LLM car'] and k == len(results) - 1:
             lines[f'line{k} SF'] = \
             ax.plot(results[f'agent {k}']['x coord pred SF'][0], results[f'agent {k}']['y coord pred SF'][0],
                     c="orange", linestyle='--')[0]  # label=f'v0 = {v02} m/s'
+        else:
+            lines[f'line{k} traj estimation'] = \
+                ax.plot(results[f'agent {k}']['trajectory estimation x'][0],
+                        results[f'agent {k}']['trajectory estimation y'][0], c="green",
+                        linestyle='--')[0]  # label=f'v0 = {v02} m/s'
+        lines[f'line{k}'] = \
+            ax.plot(results[f'agent {k}']['x coord pred'][0], results[f'agent {k}']['y coord pred'][0], c="red",
+                    linestyle='--')[0]  # label=f'v0 = {v02} m/s'
 
         # scats[f'line{k}'] = ax.scatter(results[f'agent {k}']['x coord'][0], results[f'agent {k}']['y coord'][0], c="r", s=5, label=f'car_{k + 1}')
 
@@ -153,11 +158,16 @@ def plot_vehicles(results, fig, ax, env, time):
             data = np.stack(
                 [results[f'agent {id_agent}']['x coord'][frame], results[f'agent {id_agent}']['y coord'][frame]]).T
             labels[f'{id_agent}'].set_position(data)
-            lines[f'line{id_agent}'].set_xdata(results[f'agent {id_agent}']['x coord pred'][frame])
-            lines[f'line{id_agent}'].set_ydata(results[f'agent {id_agent}']['y coord pred'][frame])
             if env['With LLM car'] and id_agent == str(len(results) - 1):
                 lines[f'line{id_agent} SF'].set_xdata(results[f'agent {id_agent}']['x coord pred SF'][frame])
                 lines[f'line{id_agent} SF'].set_ydata(results[f'agent {id_agent}']['y coord pred SF'][frame])
+            else:
+                lines[f'line{id_agent} traj estimation'].set_xdata(
+                    results[f'agent {id_agent}']['trajectory estimation x'][frame])
+                lines[f'line{id_agent} traj estimation'].set_ydata(
+                    results[f'agent {id_agent}']['trajectory estimation y'][frame])
+            lines[f'line{id_agent}'].set_xdata(results[f'agent {id_agent}']['x coord pred'][frame])
+            lines[f'line{id_agent}'].set_ydata(results[f'agent {id_agent}']['y coord pred'][frame])
 
         """for k in range(len(results)):
             x = results[f'agent {k}']['x coord'][:frame]

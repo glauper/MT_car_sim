@@ -13,6 +13,7 @@ class LLM:
         self.task_status = 0
         self.OD_messages = []
         self.OD = {}
+        self.final_messages = []
 
     def call_TP(self, env, query, agents, ego):
 
@@ -34,6 +35,8 @@ class LLM:
             "role": "assistant",
             "content": str(self.TP),
         })
+
+        self.final_messages.append({'Task Planner': self.TP})
 
         # Save the output
         save_TP_path = os.path.join(os.path.dirname(__file__), ".", "prompts/output_LLM/TP_output.json")
@@ -66,6 +69,8 @@ class LLM:
             "content": str(self.TP),
         })
 
+        self.final_messages.append({'Task Planner': self.TP})
+
         self.task_status = 0
 
         # Save the output
@@ -94,6 +99,8 @@ class LLM:
             "content": str(self.OD),
         })
 
+        self.final_messages.append({'Optimization Designer': self.OD})
+
         save_OD_path = os.path.join(os.path.dirname(__file__), ".","prompts/output_LLM/OD_output.json")
         with open(save_OD_path, 'w') as file:
             json.dump(self.OD_messages, file)
@@ -115,6 +122,8 @@ class LLM:
             "role": "assistant",
             "content": str(self.OD),
         })
+
+        self.final_messages.append({'Optimization Designer': self.OD})
 
         save_OD_path = os.path.join(os.path.dirname(__file__), ".", "prompts/output_LLM/OD_output.json")
         with open(save_OD_path, 'w') as file:

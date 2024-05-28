@@ -226,6 +226,10 @@ def results_init(env, agents):
             results[f'agent {id_vehicle}']['acc pred LLM'] = []
             results[f'agent {id_vehicle}']['steering angle pred SF'] = []
             results[f'agent {id_vehicle}']['steering angle pred LLM'] = []
+        else:
+            agents[f'{id_vehicle}'].trajecotry_estimation()
+            results[f'agent {id_vehicle}']['trajectory estimation x'] = []
+            results[f'agent {id_vehicle}']['trajectory estimation y'] = []
 
     results_path = os.path.join(os.path.dirname(__file__), ".", "../save_results/results.txt")
     env_path = os.path.join(os.path.dirname(__file__), ".", "../save_results/env.txt")
@@ -236,7 +240,7 @@ def results_init(env, agents):
 
     return results
 
-def results_update_and_save(env, agents, results):
+def results_update_and_save(env, agents, results, ego_brake):
 
     for id_vehicle, name_vehicle in enumerate(agents):
         results[f'agent {id_vehicle}']['x coord'].append(float(agents[name_vehicle].x))
@@ -249,10 +253,19 @@ def results_update_and_save(env, agents, results):
         if agents[name_vehicle].LLM_car:
             results[f'agent {id_vehicle}']['x coord pred SF'].append(list(agents[name_vehicle].previous_opt_sol_SF['X'][0,:]))
             results[f'agent {id_vehicle}']['y coord pred SF'].append(list(agents[name_vehicle].previous_opt_sol_SF['X'][1,:]))
-            results[f'agent {id_vehicle}']['acc pred SF'].append(float(agents[name_vehicle].previous_opt_sol_SF['U'][0,0]))
-            results[f'agent {id_vehicle}']['acc pred LLM'].append(float(agents[name_vehicle].previous_opt_sol['U'][0,0]))
-            results[f'agent {id_vehicle}']['steering angle pred SF'].append(float(agents[name_vehicle].previous_opt_sol_SF['U'][1,0]))
-            results[f'agent {id_vehicle}']['steering angle pred LLM'].append(float(agents[name_vehicle].previous_opt_sol['U'][1,0]))
+            if ego_brake:
+                results[f'agent {id_vehicle}']['acc pred SF'].append(float(agents[name_vehicle].input_brakes[0]))
+                results[f'agent {id_vehicle}']['acc pred LLM'].append(float(agents[name_vehicle].input_brakes[0]))
+                results[f'agent {id_vehicle}']['steering angle pred SF'].append(float(agents[name_vehicle].input_brakes[1]))
+                results[f'agent {id_vehicle}']['steering angle pred LLM'].append(float(agents[name_vehicle].input_brakes[1]))
+            else:
+                results[f'agent {id_vehicle}']['acc pred SF'].append(float(agents[name_vehicle].previous_opt_sol_SF['U'][0,0]))
+                results[f'agent {id_vehicle}']['acc pred LLM'].append(float(agents[name_vehicle].previous_opt_sol['U'][0,0]))
+                results[f'agent {id_vehicle}']['steering angle pred SF'].append(float(agents[name_vehicle].previous_opt_sol_SF['U'][1,0]))
+                results[f'agent {id_vehicle}']['steering angle pred LLM'].append(float(agents[name_vehicle].previous_opt_sol['U'][1,0]))
+        else:
+            results[f'agent {id_vehicle}']['trajectory estimation x'].append(list(agents[name_vehicle].traj_estimation[0]))
+            results[f'agent {id_vehicle}']['trajectory estimation y'].append(list(agents[name_vehicle].traj_estimation[1]))
 
     results_path = os.path.join(os.path.dirname(__file__), ".","../save_results/results.txt")
     env_path = os.path.join(os.path.dirname(__file__), ".", "../save_results/env.txt")
