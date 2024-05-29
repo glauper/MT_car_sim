@@ -4,3 +4,4 @@ matplotlib
 casadi
 openai
 streamlit
+streamlit==1.34

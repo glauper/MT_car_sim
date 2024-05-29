@@ -17,7 +17,8 @@ with open(env_path, 'r') as file:
     file_content = file.read()
 env = json.loads(file_content)
 
-plot_simulation(env['env number'], env, results)
+plot_simulation(env['env number'], env, results, t_start=0, t_end=len(results['agent 0']['x coord']))
+
 if env['With LLM car']:
     #plot_input_LLM_and_SF(results)
-    input_animation(results)
+    input_animation(results,t_start=0, t_end=len(results['agent 0']['x coord']))

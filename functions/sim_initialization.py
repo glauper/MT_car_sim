@@ -49,7 +49,7 @@ def sim_init():
 
     if SimulationParam['With LLM car']:
         Language_Module = LLM()
-        Language_Module.call_TP(env, SimulationParam['Query'], agents, ego_vehicle)
+        Language_Module.call_TP(env, SimulationParam['Query'], agents, ego_vehicle, 0)
 
         agents[str(len(agents))] = ego_vehicle
         results = results_init(env, agents)

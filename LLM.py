@@ -15,7 +15,7 @@ class LLM:
         self.OD = {}
         self.final_messages = []
 
-    def call_TP(self, env, query, agents, ego):
+    def call_TP(self, env, query, agents, ego, t):
 
         prompt = general_TP_prompt()
         description = specific_TP_prompt(env, agents, ego, query)
@@ -36,14 +36,15 @@ class LLM:
             "content": str(self.TP),
         })
 
-        self.final_messages.append({'Task Planner': self.TP})
+        self.final_messages.append({'Task Planner': self.TP,
+                                    'time': t})
 
         # Save the output
         save_TP_path = os.path.join(os.path.dirname(__file__), ".", "prompts/output_LLM/TP_output.json")
         with open(save_TP_path, 'w') as file:
             json.dump(self.TP_messages, file)
 
-    def recall_TP(self, env_nr, query, agents, ego, why):
+    def recall_TP(self, env_nr, query, agents, ego, why, t):
 
         if why['next_task']:
             motivation = """You have to replan because the task '""" + self.TP['tasks'][self.task_status-1] + """' is finished. In the next the description of the actual situation.
@@ -69,7 +70,8 @@ class LLM:
             "content": str(self.TP),
         })
 
-        self.final_messages.append({'Task Planner': self.TP})
+        self.final_messages.append({'Task Planner': self.TP,
+                                    'time': t})
 
         self.task_status = 0
 
@@ -78,7 +80,7 @@ class LLM:
         with open(save_TP_path, 'w') as file:
             json.dump(self.TP_messages, file)
 
-    def call_OD(self, env_nr, agents):
+    def call_OD(self, env_nr, agents, t):
 
         prompt = general_OD_prompt()
         objects = specific_OD_prompt(env_nr, agents)
@@ -99,13 +101,14 @@ class LLM:
             "content": str(self.OD),
         })
 
-        self.final_messages.append({'Optimization Designer': self.OD})
+        self.final_messages.append({'Optimization Designer': self.OD,
+                                    'time': t})
 
         save_OD_path = os.path.join(os.path.dirname(__file__), ".","prompts/output_LLM/OD_output.json")
         with open(save_OD_path, 'w') as file:
             json.dump(self.OD_messages, file)
 
-    def recall_OD(self, env_nr, agents):
+    def recall_OD(self, env_nr, agents, t):
 
         objects = specific_OD_prompt(env_nr, agents)
         user_input = objects + 'Query: ' + self.TP['tasks'][self.task_status]
@@ -123,7 +126,8 @@ class LLM:
             "content": str(self.OD),
         })
 
-        self.final_messages.append({'Optimization Designer': self.OD})
+        self.final_messages.append({'Optimization Designer': self.OD,
+                                    'time': t})
 
         save_OD_path = os.path.join(os.path.dirname(__file__), ".", "prompts/output_LLM/OD_output.json")
         with open(save_OD_path, 'w') as file:

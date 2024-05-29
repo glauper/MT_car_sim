@@ -5,7 +5,7 @@ import os
 import pickle
 import random
 from config.config import SimulationConfig, EnviromentConfig
-from functions.plot_functions import plot_simulation
+from functions.plot_functions import plot_simulation, input_animation
 from functions.sim_initialization import results_update_and_save, sim_init, sim_reload
 from env_controller import EnvController
 from priority_controller import PriorityController
@@ -72,8 +72,10 @@ if SimulationParam['With LLM car']:
     with open('reload_sim/Language_Module.pkl', 'wb') as file:
         pickle.dump(Language_Module, file)"""
 
-SimulationParam, env, agents, ego_vehicle, Language_Module, presence_emergency_car, order_optimization, priority, results, circular_obstacles = sim_init()
-#SimulationParam, env, agents, ego_vehicle, Language_Module, presence_emergency_car, order_optimization, priority, results, circular_obstacles = sim_reload()
+(SimulationParam, env, agents, ego_vehicle, Language_Module, presence_emergency_car, order_optimization, priority,
+ results, circular_obstacles) = sim_init()
+#SimulationParam, env, agents, ego_vehicle, Language_Module, presence_emergency_car, order_optimization, priority,
+# results, circular_obstacles = sim_reload()
 
 t = 0
 run_simulation = True
@@ -128,10 +130,16 @@ while run_simulation:
             # Check if necessary to have new Optimization Design
             if len(Language_Module.OD) == 0:
                 print('Call OD the first time, for :', Language_Module.TP['tasks'][Language_Module.task_status])
-                Language_Module.call_OD(SimulationParam['Environment'], agents)
+                Language_Module.call_OD(SimulationParam['Environment'], agents, t)
+                final_messages_path = os.path.join(os.path.dirname(__file__), ".", "prompts/output_LLM/messages.json")
+                with open(final_messages_path, 'w') as file:
+                    json.dump(Language_Module.final_messages, file)
             elif ego_vehicle.t_subtask == 0:
                 print('Call OD for :', Language_Module.TP['tasks'][Language_Module.task_status])
-                Language_Module.recall_OD(SimulationParam['Environment'], agents)
+                Language_Module.recall_OD(SimulationParam['Environment'], agents, t)
+                final_messages_path = os.path.join(os.path.dirname(__file__), ".", "prompts/output_LLM/messages.json")
+                with open(final_messages_path, 'w') as file:
+                    json.dump(Language_Module.final_messages, file)
 
             input_ego = ego_vehicle.MPC_LLM(agents, circular_obstacles, t, Language_Module)
             if SimulationParam['Controller']['Ego']['SF']['Active']:
@@ -185,8 +193,8 @@ while run_simulation:
         ego_vehicle.t_subtask += 1
         # I don't think is the best way to do that...
         agents[str(len(agents))] = ego_vehicle
-        agents = priority.SwissPriority(agents, order_optimization, SimulationParam['With LLM car'])
-        #agents = priority.NoPriority(agents, order_optimization, SimulationParam['With LLM car'])
+        #agents = priority.SwissPriority(agents, order_optimization, SimulationParam['With LLM car'])
+        agents = priority.NoPriority(agents, order_optimization, SimulationParam['With LLM car'])
         ego_vehicle = agents.pop(str(len(agents)-1))
     else:
         agents = priority.SwissPriority(agents, order_optimization, SimulationParam['With LLM car'])
@@ -198,27 +206,21 @@ while run_simulation:
     if SimulationParam['With LLM car']:
         if run_simulation:
             if next_task:
+                print('Call TP: because a task is terminated and a new one begins.')
+                Language_Module.final_messages.append({'Images': {'t_start': t-ego_vehicle.t_subtask,
+                                                                  't_end': t}})
                 ego_vehicle.t_subtask = 0
                 Language_Module.task_status += 1
-                print('Call TP: because a task is terminated and a new one begins.')
                 reason = {'next_task': True, 'SF_kicks_in': False}
-                Language_Module.final_messages.append({'Gif': 0})
-                plot_simulation(env['env number'], env, results)
-                final_messages_path = os.path.join(os.path.dirname(__file__), ".", "prompts/output_LLM/messages.json")
-                with open(final_messages_path, 'w') as file:
-                    json.dump(Language_Module.final_messages, file)
-                Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason)
+                Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
                 # If safety filter have to correct then we need to replan...how to proceed?
             elif SimulationParam['Controller']['Ego']['SF']['Replan']['Active'] and ego_vehicle.previous_opt_sol_SF['Cost'] >= SimulationParam['Controller']['Ego']['SF']['Replan']['toll']:
-                ego_vehicle.t_subtask = 0
                 print('Call TP: because SF cost are high')
+                Language_Module.final_messages.append({'Images': {'t_start': t-ego_vehicle.t_subtask,
+                                                                  't_end': t}})
+                ego_vehicle.t_subtask = 0
                 reason = {'next_task': False, 'SF_kicks_in': True}
-                Language_Module.final_messages.append({'Gif': 0})
-                plot_simulation(env['env number'], env, results)
-                final_messages_path = os.path.join(os.path.dirname(__file__), ".", "prompts/output_LLM/messages.json")
-                with open(final_messages_path, 'w') as file:
-                    json.dump(Language_Module.final_messages, file)
-                Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason)
+                Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
     else:
         reach_end_target = []
         for name_agent in agents:
@@ -239,12 +241,14 @@ while run_simulation:
 if SimulationParam['With LLM car']:
     agents[str(len(agents))] = ego_vehicle
 
-    Language_Module.final_messages.append({'Gif': 0})
-    plot_simulation(env['env number'], env, results)
+    Language_Module.final_messages.append({'Images': {'t_start': t-ego_vehicle.t_subtask,
+                                                      't_end': t}})
+    #plot_simulation(env['env number'], env, results, t_start=0, t_end=len(results['agent 0']['x coord']))
     final_messages_path = os.path.join(os.path.dirname(__file__), ".", "prompts/output_LLM/messages.json")
     with open(final_messages_path, 'w') as file:
         json.dump(Language_Module.final_messages, file)
 
 results = results_update_and_save(env, agents, results, ego_brake)
 
-plot_simulation(SimulationParam['Environment'], env, results)
+plot_simulation(SimulationParam['Environment'], env, results, t_start=0, t_end=len(results['agent 0']['x coord']))
+input_animation(results, t_start=0, t_end=len(results['agent 0']['x coord']))
