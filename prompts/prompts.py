@@ -21,10 +21,10 @@ def general_TP_prompt():
             (6) If an agent is leaving the cross, it should not be considered for the priorities.
             (7) Try to wait that the distance from the other agents is bigger then 5 m before to enter a cross.
             (8) If you want to instruct the car to move, you MUST always specify also the maximum speed.
-            (9) If you want to instruct the car to move in the first task, you MUST identify the agents that are closer than 10 m from you and ALWAYS specify the distance you must maintain from these agents. For the other agents more away then 10 you can decide if to specify the security distance.
-            (10) The minimum distance you must keep from a standard car is 3 m. You may decide to increase this distance if it is a special vehicle, e.g. a truck or so.
-            (11) If you are coming to the cross and there is an other car, which is going to his exit, you MUST choose to move to your exit only if you will not interfere with his trajectory. 
-            (12) If a car is going to his exit before you, try to understand from previous descriptions if this car is going to his exit before you because it have priority over you. In this case you should wait that this car pass.
+            (9) If you want to instruct the car to move DO NOT specify constraints on the agents, someone else will take car of that. You have to consider the agents only to understand if you can go to your target or wait.
+            (10) If you are coming to the cross and there is an other car, which is going to his exit, you MUST choose to move to your exit only if you will not interfere with his trajectory. 
+            (11) If a car is going to his exit before you, try to understand from previous descriptions if this car is going to his exit before you because it have priority over you. In this case you should wait that this car pass.
+            (12) If an agent is less then 3m away from you, you MUST brakes() and wait that this agent to pass as first task.
         
         The description of the situation will give you this list of information about the other agents:
             (1) The type of vehicle
@@ -60,7 +60,7 @@ def general_TP_prompt():
             (5) has a direction of 90 degrees clockwise with respect to your orientation 
         # Query: go to the exit on your left
         {
-            "tasks": ["go to the entry, the maximum speed is 2 m/s, maintain a distance of at least 3 m from agent 0 and agent 1", "brakes() and wait agent 0 to pass" ,"go the exits on the left, the maximum speed is 2 m/s", "go to final_target, the maximum speed is 2 m/s"]
+            "tasks": ["go to the entry, the maximum speed is 2 m/s", "brakes() and wait agent 0 to pass" ,"go the exits on the left, the maximum speed is 2 m/s", "go to final_target, the maximum speed is 2 m/s"]
         }
         
         objects = ['entry', 'exit', 'final_target']
@@ -140,6 +140,8 @@ def specific_TP_prompt_env_0(env, agents, ego, query):
             agent_orientation = agents[id_agent].target[2]
             if agent_orientation > np.pi:
                 agent_orientation = agent_orientation - 2 * np.pi
+            elif agent_orientation <= -np.pi:
+                agent_orientation = agent_orientation + 2 * np.pi
 
             if agent_orientation == 0:  # coming from the left
                 info_1 = """is coming from the left entrance of the cross with respect to you"""
@@ -147,10 +149,15 @@ def specific_TP_prompt_env_0(env, agents, ego, query):
                 info_1 = """is coming from the entrance in front of you"""
             elif agent_orientation == np.pi:  # coming from the right direction
                 info_1 = """is coming from the right entrance of the cross with respect to you"""
+            else:
+                print('ID agent', id_agent)
+                print('Orientation agent', agent_orientation)
         elif agents[id_agent].exiting and agents[id_agent].inside_cross:
             agent_orientation = agents[id_agent].target[2]
             if agent_orientation > np.pi:
                 agent_orientation = agent_orientation - 2 * np.pi
+            elif agent_orientation <= -np.pi:
+                agent_orientation = agent_orientation + 2 * np.pi
 
             if agent_orientation == 0:
                 info_1 = """is going to the exit of the cross on your right"""
@@ -160,6 +167,9 @@ def specific_TP_prompt_env_0(env, agents, ego, query):
                 info_1 = """is going to the exit of the cross on your left"""
             elif agent_orientation == - np.pi / 2:
                 info_1 = """is going to the exit of the cross next ot you"""
+            else:
+                print('ID agent', id_agent)
+                print('Orientation agent', agent_orientation)
         else:
             info_1 = """is going away from the cross"""
 
@@ -302,38 +312,38 @@ def general_OD_prompt():
 
         objects = ['entry', 'exit', 'final_target']
         agents = ['0','1']
-        # Query: go to the entry, the maximum speed is 1 m/s, maintain a distance of at least 4 m from agent 1
+        # Query: go to the entry, the maximum speed is 1 m/s
         {
             "objective": "ca.norm_2(X - self.entry['state'])**2",
             "equality_constraints": [],
-            "inequality_constraints": ["X[3] - 1", "4 - ca.norm_2(X[0:2] - agents['1'].position)"]
+            "inequality_constraints": ["X[3] - 1"]
         }
 
         objects = ['entry', 'exit', 'final_target']
         agents = ['0','1']
-        # Query: go to the exit on the left, the maximum speed is 2 m/s, maintain a distance of at least 4 m from agent 1 and agent 0
+        # Query: go to the exit on the left, the maximum speed is 2 m/s
         {
             "objective": "ca.norm_2(X - self.exit['state'])**2",
             "equality_constraints": [],
-            "inequality_constraints": ["X[3] - 2", "4 - ca.norm_2(X[0:2] - agents['0'].position)", "4 - ca.norm_2(X[0:2] - agents['1'].position)"]
+            "inequality_constraints": ["X[3] - 2"]
         }
 
         objects = ['entry', 'exit', 'final_target']
         agents = ['0','1']
-        # Query: go straight, the maximum speed is 2 m/s, maintain a distance of at least 4 m from agent 0 and at least 6 m from agent 1
+        # Query: go straight, the maximum speed is 2 m/s
         {
             "objective": "ca.norm_2(X - self.exit['state'])**2",
             "equality_constraints": [],
-            "inequality_constraints": ["X[3] - 2", "4 - ca.norm_2(X[0:2] - agents['0'].position)", "6 - ca.norm_2(X[0:2] - agents['1'].position)"]
+            "inequality_constraints": ["X[3] - 2"]
         }
         
         objects = ['entry', 'exit', 'final_target']
         agents = ['0','1']
-        # Query: go to final target, the maximum speed is 3 m/s, maintain a distance of at least 5 m from agent 0
+        # Query: go to final target, the maximum speed is 3 m/s
         {
             "objective": "ca.norm_2(X - self.final_target['state'])**2",
             "equality_constraints": [],
-            "inequality_constraints": ["X[3] - 3", "5 - ca.norm_2(X[0:2] - agents['0'].position)"]
+            "inequality_constraints": ["X[3] - 3"]
         }
         """
 

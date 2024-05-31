@@ -92,7 +92,8 @@ def input_animation(results, t_start, t_end):
 
     return ani1, ani2
 
-def plot_vehicles(results, fig, ax, env, t_start, t_end):
+def prep_plot_vehicles(results, env, t_start, ax):
+
     vehicles = {}
     labels = {}
     for id_agent in range(len(results)):
@@ -106,25 +107,84 @@ def plot_vehicles(results, fig, ax, env, t_start, t_end):
                 color = 'red'
             if id_agent != len(results) - 1:
                 vehicles[f'{id_agent}'] = patches.Rectangle(
-                    (results[f'agent {id_agent}']['x coord'][t_start] - L / 2, results[f'agent 0']['y coord'][t_start] - W / 2),
+                    (results[f'agent {id_agent}']['x coord'][t_start] - L / 2,
+                     results[f'agent {id_agent}']['y coord'][t_start] - W / 2),
                     L, W, angle=angle, rotation_point='center', facecolor=color, label=str(id_agent))
                 labels[f'{id_agent}'] = ax.text(results[f'agent {id_agent}']['x coord'][t_start],
-                                                results[f'agent 0']['y coord'][t_start], f'{id_agent}',
+                                                results[f'agent {id_agent}']['y coord'][t_start], f'{id_agent}',
                                                 ha='center', va='center', color='white')
             else:
                 if env['With LLM car']:
                     vehicles[f'{id_agent}'] = patches.Rectangle(
-                        (results[f'agent {id_agent}']['x coord'][t_start] - L / 2, results[f'agent 0']['y coord'][t_start] - W / 2),
+                        (results[f'agent {id_agent}']['x coord'][t_start] - L / 2,
+                         results[f'agent {id_agent}']['y coord'][t_start] - W / 2),
                         L, W, angle=angle, rotation_point='center', facecolor='blue', label='LLM car')
                     labels[f'{id_agent}'] = ax.text(results[f'agent {id_agent}']['x coord'][t_start],
-                                                    results[f'agent 0']['y coord'][t_start], 'LLM',
+                                                    results[f'agent {id_agent}']['y coord'][t_start], 'LLM',
                                                     ha='center', va='center', color='black')
                 else:
                     vehicles[f'{id_agent}'] = patches.Rectangle(
-                        (results[f'agent {id_agent}']['x coord'][t_start] - L / 2, results[f'agent 0']['y coord'][t_start] - W / 2),
+                        (results[f'agent {id_agent}']['x coord'][t_start] - L / 2,
+                         results[f'agent {id_agent}']['y coord'][t_start] - W / 2),
                         L, W, angle=angle, rotation_point='center', facecolor=color, label=str(id_agent))
                     labels[f'{id_agent}'] = ax.text(results[f'agent {id_agent}']['x coord'][t_start],
-                                                    results[f'agent 0']['y coord'][t_start], f'{id_agent}',
+                                                    results[f'agent {id_agent}']['y coord'][t_start], f'{id_agent}',
+                                                    ha='center', va='center', color='white')
+            ax.add_patch(vehicles[f'{id_agent}'])
+
+    lines = {}
+    # scats = {}
+    for k in range(len(results)):
+        if env['With LLM car'] and k == len(results) - 1:
+            lines[f'line{k} SF'] = \
+                ax.plot(results[f'agent {k}']['x coord pred SF'][t_start],
+                        results[f'agent {k}']['y coord pred SF'][t_start],
+                        c="orange", linestyle='--')[0]  # label=f'v0 = {v02} m/s'
+        else:
+            lines[f'line{k} traj estimation'] = \
+                ax.plot(results[f'agent {k}']['trajectory estimation x'][t_start],
+                        results[f'agent {k}']['trajectory estimation y'][t_start], c="green",
+                        linestyle='--')[0]  # label=f'v0 = {v02} m/s'
+        lines[f'line{k}'] = \
+            ax.plot(results[f'agent {k}']['x coord pred'][t_start], results[f'agent {k}']['y coord pred'][t_start],
+                    c="red",
+                    linestyle='--')[0]  # label=f'v0 = {v02} m/s'
+
+    return vehicles, labels, lines, ax
+
+def plot_vehicles(results, fig, ax, env, t_start, t_end):
+    """vehicles = {}
+    labels = {}
+    for id_agent in range(len(results)):
+        if results[f'agent {id_agent}']['type'] in env['Vehicle Specification']['types']:
+            L = env['Vehicle Specification'][results[f'agent {id_agent}']['type']]['length']
+            W = env['Vehicle Specification'][results[f'agent {id_agent}']['type']]['width']
+            angle = results[f'agent {id_agent}']['theta'][t_start] * 180 / np.pi
+            if results[f'agent {id_agent}']['type'] == 'standard car':
+                color = 'green'
+            elif results[f'agent {id_agent}']['type'] == 'emergency car':
+                color = 'red'
+            if id_agent != len(results) - 1:
+                vehicles[f'{id_agent}'] = patches.Rectangle(
+                    (results[f'agent {id_agent}']['x coord'][t_start] - L / 2, results[f'agent {id_agent}']['y coord'][t_start] - W / 2),
+                    L, W, angle=angle, rotation_point='center', facecolor=color, label=str(id_agent))
+                labels[f'{id_agent}'] = ax.text(results[f'agent {id_agent}']['x coord'][t_start],
+                                                results[f'agent {id_agent}']['y coord'][t_start], f'{id_agent}',
+                                                ha='center', va='center', color='white')
+            else:
+                if env['With LLM car']:
+                    vehicles[f'{id_agent}'] = patches.Rectangle(
+                        (results[f'agent {id_agent}']['x coord'][t_start] - L / 2, results[f'agent {id_agent}']['y coord'][t_start] - W / 2),
+                        L, W, angle=angle, rotation_point='center', facecolor='blue', label='LLM car')
+                    labels[f'{id_agent}'] = ax.text(results[f'agent {id_agent}']['x coord'][t_start],
+                                                    results[f'agent {id_agent}']['y coord'][t_start], 'LLM',
+                                                    ha='center', va='center', color='black')
+                else:
+                    vehicles[f'{id_agent}'] = patches.Rectangle(
+                        (results[f'agent {id_agent}']['x coord'][t_start] - L / 2, results[f'agent {id_agent}']['y coord'][t_start] - W / 2),
+                        L, W, angle=angle, rotation_point='center', facecolor=color, label=str(id_agent))
+                    labels[f'{id_agent}'] = ax.text(results[f'agent {id_agent}']['x coord'][t_start],
+                                                    results[f'agent {id_agent}']['y coord'][t_start], f'{id_agent}',
                                                     ha='center', va='center', color='white')
             ax.add_patch(vehicles[f'{id_agent}'])
 
@@ -145,7 +205,9 @@ def plot_vehicles(results, fig, ax, env, t_start, t_end):
                     linestyle='--')[0]  # label=f'v0 = {v02} m/s'
 
         # scats[f'line{k}'] = ax.scatter(results[f'agent {k}']['x coord'][0], results[f'agent {k}']['y coord'][0], c="r", s=5, label=f'car_{k + 1}')
+    """
 
+    vehicles, labels, lines, ax = prep_plot_vehicles(results, env, t_start, ax)
     def update(frame):
 
         for id_agent in vehicles:
@@ -171,7 +233,7 @@ def plot_vehicles(results, fig, ax, env, t_start, t_end):
             lines[f'line{id_agent}'].set_xdata(results[f'agent {id_agent}']['x coord pred'][t_start+frame])
             lines[f'line{id_agent}'].set_ydata(results[f'agent {id_agent}']['y coord pred'][t_start+frame])
 
-        return (vehicles)
+        return (vehicles, labels, lines)
 
     ani = FuncAnimation(fig=fig, func=update, frames=t_end-t_start, interval=100, repeat=False)
 
@@ -181,26 +243,33 @@ def plot_vehicles(results, fig, ax, env, t_start, t_end):
     return ani
 
 def plot_simulation(env_type, env, results, t_start, t_end):
+
+    fig, ax = plt.subplots()
+
     if env_type == 0:
-        ani = plot_simulation_env_0(env, results, t_start, t_end)
+        ani, ax, fig = plot_simulation_env_0(env, results, t_start, t_end, fig, ax)
     elif env_type == 1:
-        plot_simulation_env_1(env, results, t_start, t_end)
+        ani, ax, fig = plot_simulation_env_1(env, results, t_start, t_end, fig, ax)
     elif env_type == 2:
-        plot_simulation_env_2(env, results, t_start, t_end)
+        ani, ax, fig = plot_simulation_env_2(env, results, t_start, t_end, fig, ax)
     elif env_type == 3:
-        plot_simulation_env_3(env, results, t_start, t_end)
+        ani, ax, fig = plot_simulation_env_3(env, results, t_start, t_end, fig, ax)
     elif env_type == 4:
-        plot_simulation_env_4(env, results, t_start, t_end)
+        ani, ax, fig = plot_simulation_env_4(env, results, t_start, t_end, fig, ax)
     elif env_type == 5:
-        plot_simulation_env_5(env, results, t_start, t_end)
+        ani, ax, fig = plot_simulation_env_5(env, results, t_start, t_end, fig, ax)
     else:
         print('Not ready')
 
+    ax.set_xlim(env["State space"]["x limits"][0], env["State space"]["x limits"][1])
+    ax.set_ylim(env["State space"]["y limits"][0], env["State space"]["y limits"][1])
+
+    plt.show()
+
     return ani
 
-def plot_simulation_env_0(env, results, t_start, t_end):
+def plot_simulation_env_0(env, results, t_start, t_end, fig, ax):
 
-    fig, ax = plt.subplots()
     obstacles = env['Road Limits']
     for id in obstacles:
         """if obstacles[id]['radius'][0] != obstacles[id]['radius'][1]:
@@ -226,19 +295,21 @@ def plot_simulation_env_0(env, results, t_start, t_end):
     for id in env['Exits']:
         ax.scatter(env['Exits'][id]['position'][0], env['Exits'][id]['position'][1], color='blue')
 
-    ani = plot_vehicles(results, fig, ax, env, t_start, t_end)
+    if t_start != None:
+        ani = plot_vehicles(results, fig, ax, env, t_start, t_end)
+    else:
+        ani = None
 
-    ax.set_xlim(env["State space"]["x limits"][0], env["State space"]["x limits"][1])
-    ax.set_ylim(env["State space"]["y limits"][0], env["State space"]["y limits"][1])
+    #ax.set_xlim(env["State space"]["x limits"][0], env["State space"]["x limits"][1])
+    #ax.set_ylim(env["State space"]["y limits"][0], env["State space"]["y limits"][1])
 
-    plt.show()
+    #plt.show()
 
-    return ani
+    return ani, ax, fig
 
 
-def plot_simulation_env_1(env, results, t_start, t_end):
-    time = len(results['agent 0']['x coord'])
-    fig, ax = plt.subplots()
+def plot_simulation_env_1(env, results, t_start, t_end, fig, ax):
+
     obstacles = env['Road Limits']
     for id in obstacles:
         """if obstacles[id]['radius'][0] != obstacles[id]['radius'][1]:
@@ -275,7 +346,9 @@ def plot_simulation_env_1(env, results, t_start, t_end):
 
     plt.show()
 
-def plot_simulation_env_2(env, results, t_start, t_end):
+    return ani, ax, fig
+
+def plot_simulation_env_2(env, results, t_start, t_end, fig, ax):
     time = len(results['agent 0']['x coord'])
     fig, ax = plt.subplots()
     obstacles = env['Road Limits']
@@ -314,7 +387,9 @@ def plot_simulation_env_2(env, results, t_start, t_end):
 
     plt.show()
 
-def plot_simulation_env_3(env, results, t_start, t_end):
+    return ani, ax, fig
+
+def plot_simulation_env_3(env, results, t_start, t_end, fig, ax):
     time = len(results['agent 0']['x coord'])
     fig, ax = plt.subplots()
     obstacles = env['Road Limits']
@@ -349,7 +424,9 @@ def plot_simulation_env_3(env, results, t_start, t_end):
 
     plt.show()
 
-def plot_simulation_env_4(env, results, t_start, t_end):
+    return ani, ax, fig
+
+def plot_simulation_env_4(env, results, t_start, t_end, fig, ax):
     time = len(results['agent 0']['x coord'])
     fig, ax = plt.subplots()
     obstacles = env['Road Limits']
@@ -384,7 +461,9 @@ def plot_simulation_env_4(env, results, t_start, t_end):
 
     plt.show()
 
-def plot_simulation_env_5(env, results, t_start, t_end):
+    return ani, ax, fig
+
+def plot_simulation_env_5(env, results, t_start, t_end, fig, ax):
     time = len(results['agent 0']['x coord'])
     fig, ax = plt.subplots()
     obstacles = env['Road Limits']
@@ -422,3 +501,5 @@ def plot_simulation_env_5(env, results, t_start, t_end):
     ax.set_ylim(env["State space"]["y limits"][0], env["State space"]["y limits"][1])
 
     plt.show()
+
+    return ani, ax, fig

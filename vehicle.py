@@ -377,11 +377,17 @@ class Vehicle:
         self.traj_estimation = np.zeros((self.n, self.N+1))
         self.traj_estimation[:, 0] = self.state[:, 0]
         for k in range(self.N):
-            beta = np.arctan(self.l_r / (self.l_r + self.l_f) * np.tan(input[1]))
-            self.traj_estimation[0, k+1] = self.traj_estimation[0, k] + self.delta_t * self.traj_estimation[3, k] * np.cos(self.traj_estimation[2, k] + beta)
-            self.traj_estimation[1, k+1] = self.traj_estimation[1, k] + self.delta_t * self.traj_estimation[3, k] * np.sin(self.traj_estimation[2, k] + beta)
-            self.traj_estimation[2, k+1] = self.traj_estimation[2, k] + self.delta_t * self.traj_estimation[3, k] / self.l_r * np.sin(beta)
-            self.traj_estimation[3, k+1] = self.traj_estimation[3, k] + self.delta_t * input[0]
+            if k <= self.N:
+                beta = np.arctan(self.l_r / (self.l_r + self.l_f) * np.tan(input[1]))
+                self.traj_estimation[0, k+1] = self.traj_estimation[0, k] + self.delta_t * self.traj_estimation[3, k] * np.cos(self.traj_estimation[2, k] + beta)
+                self.traj_estimation[1, k+1] = self.traj_estimation[1, k] + self.delta_t * self.traj_estimation[3, k] * np.sin(self.traj_estimation[2, k] + beta)
+                self.traj_estimation[2, k+1] = self.traj_estimation[2, k] + self.delta_t * self.traj_estimation[3, k] / self.l_r * np.sin(beta)
+                self.traj_estimation[3, k+1] = self.traj_estimation[3, k] + self.delta_t * input[0]
+            else:
+                self.traj_estimation[0, k + 1] = self.traj_estimation[0, k]
+                self.traj_estimation[1, k + 1] = self.traj_estimation[1, k]
+                self.traj_estimation[2, k + 1] = self.traj_estimation[2, k]
+                self.traj_estimation[3, k + 1] = self.traj_estimation[3, k]
 
     def MPC_LLM(self, agents, circular_obstacles, t, llm):
 
@@ -398,33 +404,39 @@ class Vehicle:
             # State and Input constraints
             opti.subject_to(self.A_x @ X[:, k + 1] <= self.b_x)
             opti.subject_to(self.A_u @ U[:, k] <= self.b_u)
+            opti.subject_to((X[0, k] - self.x) **2 + (X[1, k] - self.y) **2 <= 10 ** 2)
 
             # System dynamics constraints
             opti.subject_to(self.dynamics_constraints(X[:, k + 1], X[:, k], U[:, k]))
 
         cost, opti = self.OD_output(opti, cost, llm, X[:,-1], U[:,-1], agents) # U[-1] and X[-1] do not corresponds!
+        opti.subject_to(self.A_x @ X[:, -1] <= self.b_x)
+        opti.subject_to((X[0, -1] - self.x) ** 2 + (X[1, -1] - self.y) ** 2 <= 10 ** 2)
+        # Stand still for the last state!
+        opti.subject_to(X[3, -1] == 0)
 
         # Initial state
         opti.subject_to(X[:, 0] == self.state)
 
-        """# Agents avoidance
+        # Agents avoidance
         if len(agents) >= 1:
             for k in range(self.N + 1):
                 for id_agent in agents:
                     diff = X[0:2, k] - agents[id_agent].position
                     # Which of the distance have to keep? mine or of the other one? Or one standard for all
-                    if self.security_dist >= agents[id_agent].security_dist:
-                        opti.subject_to(ca.transpose(diff) @ diff >= self.security_dist ** 2)
-                    else:
-                        opti.subject_to(ca.transpose(diff) @ diff >= agents[id_agent].security_dist ** 2)"""
+                    if agents[id_agent].security_dist != 0:
+                        if self.security_dist >= agents[id_agent].security_dist:
+                            opti.subject_to(ca.transpose(diff) @ diff >= self.security_dist ** 2)
+                        else:
+                            opti.subject_to(ca.transpose(diff) @ diff >= agents[id_agent].security_dist ** 2)
 
-        # Obstacle avoidance
+        """# Obstacle avoidance
         if len(circular_obstacles) != 0:
             for id_obst in circular_obstacles:
                 for k in range(self.N + 1):
                     diff_x = (X[0, k] - circular_obstacles[id_obst]['center'][0]) ** 2 / (circular_obstacles[id_obst]['r_x']) ** 2
                     diff_y = (X[1, k] - circular_obstacles[id_obst]['center'][1]) ** 2 / (circular_obstacles[id_obst]['r_y']) ** 2
-                    opti.subject_to(diff_x + diff_y >= 1)
+                    opti.subject_to(diff_x + diff_y >= 1)"""
 
         opti.minimize(cost)
         # Solve the optimization problem
@@ -433,8 +445,10 @@ class Vehicle:
             opti.set_initial(U, np.zeros((self.m, self.N)))
 
         else:
-            opti.set_initial(X, self.previous_opt_sol['X'])
-            opti.set_initial(U, self.previous_opt_sol['U'])
+            """opti.set_initial(X, self.previous_opt_sol['X'])
+            opti.set_initial(U, self.previous_opt_sol['U'])"""
+            opti.set_initial(X, np.tile(self.state, (1, self.N + 1)).reshape(self.n, self.N + 1))
+            opti.set_initial(U, np.zeros((self.m, self.N)))
 
         opti.solver('ipopt')
         sol = opti.solve()
@@ -481,7 +495,6 @@ class Vehicle:
 
     def SF(self, u_lernt, agents, circular_obstacles, t):
 
-
         opti = ca.Opti()
 
         X = opti.variable(self.n, self.N_SF + 1)
@@ -489,13 +502,14 @@ class Vehicle:
         x_s = opti.variable(self.n, 1)
         u_s = opti.variable(self.m, 1)
 
-        #opti.minimize(ca.norm_2(u_lernt - U[:, 0]) ** 2 + ca.norm_2(x_s - self.previous_opt_sol['X'][:,-1]) ** 2)
-        opti.minimize(ca.norm_2(u_lernt - U[:, 0]) ** 2)
+        opti.minimize(ca.norm_2(u_lernt - U[:, 0]) ** 2 + ca.norm_2(x_s - self.previous_opt_sol['X'][:,-1]) ** 2)
+        #opti.minimize(ca.norm_2(u_lernt - U[:, 0]) ** 2)
 
         for k in range(self.N_SF):
             # State and Input constraints
             opti.subject_to(self.A_x @ X[:, k + 1] <= self.b_x)
             opti.subject_to(self.A_u @ U[:, k] <= self.b_u)
+            opti.subject_to((X[0, k] - self.x) ** 2 + (X[1,k] - self.y) ** 2 <= 10 ** 2)
 
             # System dynamics constraints
             opti.subject_to(self.dynamics_constraints(X[:, k + 1], X[:, k], U[:, k]))
@@ -512,9 +526,10 @@ class Vehicle:
                         diff = X[0:2, k] - agents[id_agent].traj_estimation[0:2, k]
                         # Which of the distance have to keep? mine or of the other one? Or one standard for all
                         if self.security_dist >= agents[id_agent].security_dist:
-                            opti.subject_to(ca.transpose(diff) @ diff >= (self.security_dist+1) ** 2 )
+                            opti.subject_to(ca.transpose(diff) @ diff >= (self.security_dist) ** 2 )
                         else:
-                            opti.subject_to(ca.transpose(diff) @ diff >= (agents[id_agent].security_dist+1) ** 2)
+                            opti.subject_to(ca.transpose(diff) @ diff >= (agents[id_agent].security_dist) ** 2)
+
         # Obstacle avoidance
         if len(circular_obstacles) != 0:
             for id_obst in circular_obstacles:
@@ -529,6 +544,7 @@ class Vehicle:
         opti.subject_to(self.dynamics_constraints(x_s, x_s, u_s))
         # Terminal constraints
         opti.subject_to(X[:, -1] == x_s)  # x(N) == x_s
+        opti.subject_to((X[0, -1] - self.x) ** 2 + (X[1, -1] - self.y) ** 2 <= 10 ** 2)
 
         # Solve the optimization problem
         if t == 0:  # or agents[f'{i}'].target_status
@@ -557,7 +573,8 @@ class Vehicle:
         self.previous_opt_sol_SF['U'] = sol.value(U)
         self.previous_opt_sol_SF['x_s'] = sol.value(x_s)
         self.previous_opt_sol_SF['u_s'] = sol.value(u_s)
-        self.previous_opt_sol_SF['Cost'] = sol.value(np.linalg.norm(u_lernt - sol.value(U)[:, 0]) ** 2)
+        self.previous_opt_sol_SF['Cost'] = sol.value(np.linalg.norm(u_lernt - sol.value(U)[:, 0]) ** 2 +
+                                                     np.linalg.norm(sol.value(x_s) - self.previous_opt_sol['X'][:,-1]) ** 2)
 
         input = sol.value(U)[:, 0].reshape((self.m, 1))
 
