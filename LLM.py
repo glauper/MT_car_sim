@@ -36,6 +36,8 @@ class LLM:
             "content": str(self.TP),
         })
 
+        self.final_messages.append({'User': query,
+                                    'time': t})
         self.final_messages.append({'Task Planner': self.TP,
                                     'time': t})
 
@@ -70,6 +72,8 @@ class LLM:
             "content": str(self.TP),
         })
 
+        self.final_messages.append({'User': query,
+                                    'time': t})
         self.final_messages.append({'Task Planner': self.TP,
                                     'time': t})
 
@@ -101,6 +105,8 @@ class LLM:
             "content": str(self.OD),
         })
 
+        self.final_messages.append({'User': self.TP['tasks'][self.task_status],
+                                    'time': t})
         self.final_messages.append({'Optimization Designer': self.OD,
                                     'time': t})
 
@@ -126,6 +132,8 @@ class LLM:
             "content": str(self.OD),
         })
 
+        self.final_messages.append({'User': self.TP['tasks'][self.task_status],
+                                    'time': t})
         self.final_messages.append({'Optimization Designer': self.OD,
                                     'time': t})
 
@@ -152,9 +160,3 @@ class LLM:
         )
 
         return chat_completion.choices[0].message.content
-
-    def get_TP(self, system_chioce, simulation_case):
-        return boh
-
-    def get_OD(self, system_chioce, simulation_case, OD_task_status):
-        return boh

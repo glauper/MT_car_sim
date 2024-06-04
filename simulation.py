@@ -108,7 +108,7 @@ while run_simulation:
                 if 'brakes()' in Language_Module.TP['tasks'][Language_Module.task_status]:
                     too_near = False
                 else:
-                    too_near = False
+                    too_near = True
 
     if SimulationParam['With LLM car']:
         ego_brake = False
@@ -219,8 +219,8 @@ while run_simulation:
         ego_vehicle.t_subtask += 1
         # I don't think is the best way to do that...
         agents[str(len(agents))] = ego_vehicle
-        #agents = priority.SwissPriority(agents, order_optimization, SimulationParam['With LLM car'])
-        agents = priority.NoPriority(agents, order_optimization, SimulationParam['With LLM car'])
+        agents = priority.SwissPriority(agents, order_optimization, SimulationParam['With LLM car'])
+        #agents = priority.NoPriority(agents, order_optimization, SimulationParam['With LLM car'])
         ego_vehicle = agents.pop(str(len(agents)-1))
     else:
         agents = priority.SwissPriority(agents, order_optimization, SimulationParam['With LLM car'])

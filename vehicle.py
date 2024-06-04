@@ -412,6 +412,7 @@ class Vehicle:
         cost, opti = self.OD_output(opti, cost, llm, X[:,-1], U[:,-1], agents) # U[-1] and X[-1] do not corresponds!
         opti.subject_to(self.A_x @ X[:, -1] <= self.b_x)
         opti.subject_to((X[0, -1] - self.x) ** 2 + (X[1, -1] - self.y) ** 2 <= 10 ** 2)
+
         # Stand still for the last state!
         opti.subject_to(X[3, -1] == 0)
 

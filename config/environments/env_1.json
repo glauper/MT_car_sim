@@ -54,7 +54,7 @@
 
 	"Vehicle Specification": {
 		"types": ["standard car"],
-		"standard_car": {
+		"standard car": {
 			"length": 3,
 			"width": 2,
 			"l_f": 1,

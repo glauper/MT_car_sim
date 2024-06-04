@@ -323,23 +323,26 @@ def plot_simulation_env_1(env, results, t_start, t_end, fig, ax):
             ax.set_aspect('equal')
             ax.add_patch(circle)"""
         ax.set_aspect('equal')
-        plt.plot(obstacles[id]['line x'], obstacles[id]['line y'], color='black')
+        ax.plot(obstacles[id]['line x'], obstacles[id]['line y'], color='black')
 
     patch =  patches.Rectangle((0, -7), 6, 1, angle=0 , rotation_point='center', facecolor='black')
     ax.add_patch(patch)
     patch = patches.Rectangle((-6, 6), 6, 1, angle=0, rotation_point='center', facecolor='black')
     ax.add_patch(patch)
 
-    plt.plot([-25, 25], [0, 0], color='black', linestyle='--')
-    plt.plot([0, 0], [-25, -6], color='black', linestyle='--')
-    plt.plot([0, 0], [25, 6], color='black', linestyle='--')
+    ax.plot([-25, 25], [0, 0], color='black', linestyle='--')
+    ax.plot([0, 0], [-25, -6], color='black', linestyle='--')
+    ax.plot([0, 0], [25, 6], color='black', linestyle='--')
 
     for id in env['Entrances']:
-        plt.scatter(env['Entrances'][id]['position'][0], env['Entrances'][id]['position'][1], color='magenta')
+        ax.scatter(env['Entrances'][id]['position'][0], env['Entrances'][id]['position'][1], color='magenta')
     for id in env['Exits']:
-        plt.scatter(env['Exits'][id]['position'][0], env['Exits'][id]['position'][1], color='blue')
+        ax.scatter(env['Exits'][id]['position'][0], env['Exits'][id]['position'][1], color='blue')
 
-    ani = plot_vehicles(results, fig, ax, env, t_start, t_end)
+    if t_start != None:
+        ani = plot_vehicles(results, fig, ax, env, t_start, t_end)
+    else:
+        ani = None
 
     ax.set_xlim(env["State space"]["x limits"][0], env["State space"]["x limits"][1])
     ax.set_ylim(env["State space"]["y limits"][0], env["State space"]["y limits"][1])

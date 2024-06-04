@@ -194,7 +194,7 @@ def specific_TP_prompt_env_1(env, agents, ego, query):
 
     if ego.entering:
         description = """
-        Description: You are approaching a road cross with four entrances and four exits. At the entry of your lane in the cross there is a stop signal. 
+        Description: You are approaching a road cross with four entrances and four exits. At the entry of your lane in the cross there is a stop signal. Therefore you have to give priority to the other vehicle in the cross.
         You are coming in the cross from one of the entrances, where the maximum permitted speed is """+str(ego.entry['max vel'])+""" m/s.
         The entry in the cross of your lane is """+str(round(np.linalg.norm(ego.position - ego.entry['position']), 1))+""" m away and you are moving with a velocity of """+str(round(ego.velocity[0], 1))+""" m/s. The other three entries to the cross are around 12 m away from your entry.
         There are other """+str(len(agents))+""" agents moving in the region of the road cross.
@@ -231,6 +231,8 @@ def specific_TP_prompt_env_1(env, agents, ego, query):
             agent_orientation = agents[id_agent].target[2]
             if agent_orientation > np.pi:
                 agent_orientation = agent_orientation - 2 * np.pi
+            elif agent_orientation <= -np.pi:
+                agent_orientation = agent_orientation + 2 * np.pi
 
             if agent_orientation == 0:  # coming from the left
                 info_1 = """is coming from the left entrance of the cross with respect to you"""
@@ -242,6 +244,8 @@ def specific_TP_prompt_env_1(env, agents, ego, query):
             agent_orientation = agents[id_agent].target[2]
             if agent_orientation > np.pi:
                 agent_orientation = agent_orientation - 2 * np.pi
+            elif agent_orientation <= -np.pi:
+                agent_orientation = agent_orientation + 2 * np.pi
 
             if agent_orientation == 0:
                 info_1 = """is going to the exit of the cross on your right"""
@@ -297,9 +301,9 @@ def general_OD_prompt():
             (19) The have access to the target state represented by the objects you can use `self.object['state']`, for example for the objects = ['exit'] you can use `self.exit['state']`. 
             (20) The have access to the target position represented by the objects you can use `self.object['position']`, for example for the objects = ['exit'] you can use `self.exit['position']`.
             (21) The have access to the target x coordinate represented by the objects you can use `self.object['x']`, for example for the objects = ['exit'] you can use `self.exit['x']`. 
-            (21) The have access to the target y coordinate represented by the objects you can use `self.object['y']`, for example for the objects = ['exit'] you can use `self.exit['y']`. 
-            (21) The have access to the target orientation represented by the objects you can use `self.object['theta']`, for example for the objects = ['exit'] you can use `self.exit['theta']`. 
-            (22) The have access to the target velocity represented by the objects you can use `self.object['velocity']`, for example for the objects = ['exit'] you can use `self.exit['velocity']`. 
+            (22) The have access to the target y coordinate represented by the objects you can use `self.object['y']`, for example for the objects = ['exit'] you can use `self.exit['y']`. 
+            (23) The have access to the target orientation represented by the objects you can use `self.object['theta']`, for example for the objects = ['exit'] you can use `self.exit['theta']`. 
+            (24) The have access to the target velocity represented by the objects you can use `self.object['velocity']`, for example for the objects = ['exit'] you can use `self.exit['velocity']`. 
         
         Rules:
             (1) You MUST write every equality constraints such that it is satisfied if it is = 0:
