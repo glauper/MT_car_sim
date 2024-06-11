@@ -4,6 +4,54 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.animation import FuncAnimation, FFMpegWriter
 
+def save_all_frames(results, env):
+    for t in range(len(results['agent 0']['x coord'])):
+        fig, ax = plt.subplots()
+        if env['env number'] == 0:
+            ani, ax, fig = plot_simulation_env_0(env, results, None, None, fig, ax)
+        elif env['env number'] == 1:
+            ani, ax, fig = plot_simulation_env_1(env, results, None, None, fig, ax)
+        elif env['env number'] == 2:
+            ani, ax, fig = plot_simulation_env_2(env, results, None, None, fig, ax)
+        elif env['env number'] == 3:
+            ani, ax, fig = plot_simulation_env_3(env, results, None, None, fig, ax)
+        elif env['env number'] == 4:
+            ani, ax, fig = plot_simulation_env_4(env, results, None, None, fig, ax)
+        elif env['env number'] == 5:
+            ani, ax, fig = plot_simulation_env_5(env, results, None, None, fig, ax)
+
+        ax.set_aspect('equal')
+
+        vehicles, labels, lines, ax = prep_plot_vehicles(results, env, t, ax)
+
+        ax.set_xlim(env["State space"]["x limits"][0], env["State space"]["x limits"][1])
+        ax.set_ylim(env["State space"]["y limits"][0], env["State space"]["y limits"][1])
+
+        path_fig = os.path.join(os.path.dirname(__file__), "..", f"save_results/images_sim/")
+        fig.savefig(path_fig + f'{t}.png')
+        plt.close(fig)
+
+        fig, ax = plt.subplots()
+        acc_SF, acc_LLM, line1, line2, ax = prep_plot_acc_input(results, t, ax)
+
+        ax.set_xlim(0 - 0.5,len(results['agent 0']['x coord'])  + 0.5)
+        ax.set_ylim(min(min(acc_SF), min(acc_LLM)) - 0.5, max(max(acc_SF), max(acc_LLM)) + 0.5)
+
+        path_fig = os.path.join(os.path.dirname(__file__), "..", f"save_results/images_acc/")
+        fig.savefig(path_fig + f'{t}.png')
+        plt.close(fig)
+
+        fig, ax = plt.subplots()
+
+        steering_SF, steering_LLM, line3, line4, ax = prep_plot_steer_input(results, t, ax)
+
+        ax.set_xlim(0 - 0.5, len(results['agent 0']['x coord']) + 0.5)
+        ax.set_ylim(min(min(steering_SF), min(steering_LLM)) - 0.5, max(max(steering_SF), max(steering_LLM)) + 0.5)
+
+        path_fig = os.path.join(os.path.dirname(__file__), "..", f"save_results/images_steer/")
+        fig.savefig(path_fig + f'{t}.png')
+        plt.close(fig)
+
 def plot_input_LLM_and_SF(results, t_start, t_end):
     time = np.arange(len(results[f'agent {str(len(results)-1)}']['acc pred SF']))
     fig, axes = plt.subplots(nrows=1, ncols=2)
@@ -23,26 +71,29 @@ def plot_input_LLM_and_SF(results, t_start, t_end):
     axes[1].set_ylabel('[deg]')
     axes[1].legend(['SF', 'LLM'])
 
-    plt.show()
+    #plt.show()
 
 
 def input_animation(results, t_start, t_end):
     fig, ax1= plt.subplots()
 
-    time = np.arange(len(results[f'agent {str(len(results) - 1)}']['acc pred SF']))
+    """time = np.arange(len(results[f'agent {str(len(results) - 1)}']['acc pred SF']))
     acc_SF = results[f'agent {str(len(results)-1)}']['acc pred SF']
     acc_LLM = results[f'agent {str(len(results) - 1)}']['acc pred LLM']
 
     line1, = ax1.plot(time[t_start], acc_SF[t_start], color='orange')
     line2, = ax1.plot(time[t_start], acc_LLM[t_start], color='red')
 
-    ax1.set_xlim(min(time[t_start:t_end]) - 0.5, max(time[t_start:t_end]) + 0.5)
-    ax1.set_ylim(min(min(acc_SF), min(acc_LLM)) - 0.5, max(max(acc_SF), max(acc_LLM)) + 0.5)
-
     ax1.legend(['SF', 'LLM'])
     ax1.set_xlabel('Time')
     ax1.set_ylabel('[m/s^2]')
-    ax1.set_title('Acceleration')
+    ax1.set_title('Acceleration')"""
+
+    acc_SF, acc_LLM, line1, line2, ax1 = prep_plot_acc_input(results, t_start, ax1)
+
+    time = np.arange(len(results[f'agent {str(len(results) - 1)}']['acc pred SF']))
+    ax1.set_xlim(min(time[t_start:t_end]) - 0.5, max(time[t_start:t_end]) + 0.5)
+    ax1.set_ylim(min(min(acc_SF), min(acc_LLM)) - 0.5, max(max(acc_SF), max(acc_LLM)) + 0.5)
 
     def update1(frame):
         line1.set_xdata(time[t_start:t_start+frame])
@@ -52,28 +103,31 @@ def input_animation(results, t_start, t_end):
         return line1, line2
 
     # Create animations
-    ani1 = FuncAnimation(fig=fig, func=update1, frames=t_end-t_start, interval=100, blit=True, repeat=False)
+    ani1 = FuncAnimation(fig=fig, func=update1, frames=t_end-t_start, interval=50, blit=True, repeat=False)
 
     path = os.path.join(os.path.dirname(__file__), "..")
     ani1.save(path + '/animation/acc_input.gif', writer='pillow')
-    plt.show()
+    #plt.show()
+    plt.close(fig)
 
     fig, ax2 = plt.subplots()
 
-    time = np.arange(len(results[f'agent {str(len(results) - 1)}']['acc pred SF']))
+    """time = np.arange(len(results[f'agent {str(len(results) - 1)}']['acc pred SF']))
     steering_SF = [x * 180 / np.pi for x in results[f'agent {str(len(results) - 1)}']['steering angle pred SF']]
     steering_LLM = [x * 180 / np.pi for x in results[f'agent {str(len(results) - 1)}']['steering angle pred LLM']]
 
     line3, = ax2.plot(time[t_start], steering_SF[t_start], color='orange')
     line4, = ax2.plot(time[t_start], steering_LLM[t_start], color='red')
 
-    ax2.set_xlim(min(time[t_start:t_end])  - 0.5, max(time[t_start:t_end]) + 0.5)
-    ax2.set_ylim(min(min(steering_SF), min(steering_LLM)) - 0.5, max(max(steering_SF), max(steering_LLM)) + 0.5)
-
     ax2.legend(['SF', 'LLM'])
     ax2.set_xlabel('Time')
     ax2.set_ylabel('[deg]')
-    ax2.set_title('Steering angle')
+    ax2.set_title('Steering angle')"""
+
+    steering_SF, steering_LLM, line3, line4, ax2 = prep_plot_steer_input(results, t_start, ax2)
+
+    ax2.set_xlim(min(time[t_start:t_end]) - 0.5, max(time[t_start:t_end]) + 0.5)
+    ax2.set_ylim(min(min(steering_SF), min(steering_LLM)) - 0.5, max(max(steering_SF), max(steering_LLM)) + 0.5)
 
     def update2(frame):
         line3.set_xdata(time[t_start:t_start+frame])
@@ -83,14 +137,48 @@ def input_animation(results, t_start, t_end):
 
         return line3, line4
 
-    ani2 = FuncAnimation(fig=fig, func=update2, frames=t_end-t_start, interval=100, blit=True, repeat=False)
+    ani2 = FuncAnimation(fig=fig, func=update2, frames=t_end-t_start, interval=50, blit=True, repeat=False)
 
     path = os.path.join(os.path.dirname(__file__), "..")
     ani2.save(path + '/animation/steering_input.gif', writer='pillow')
 
-    plt.show()
+    #plt.show()
+    plt.close(fig)
 
     return ani1, ani2
+
+
+def prep_plot_steer_input(results, t_start, ax2):
+
+    time = np.arange(len(results[f'agent {str(len(results) - 1)}']['acc pred SF']))
+    steering_SF = [x * 180 / np.pi for x in results[f'agent {str(len(results) - 1)}']['steering angle pred SF']]
+    steering_LLM = [x * 180 / np.pi for x in results[f'agent {str(len(results) - 1)}']['steering angle pred LLM']]
+
+    line3, = ax2.plot(time[:t_start], steering_SF[:t_start], color='orange')
+    line4, = ax2.plot(time[:t_start], steering_LLM[:t_start], color='red')
+
+    ax2.legend(['SF', 'LLM'])
+    ax2.set_xlabel('Time')
+    ax2.set_ylabel('[deg]')
+    ax2.set_title('Steering angle')
+
+    return steering_SF, steering_LLM, line3, line4, ax2
+
+def prep_plot_acc_input(results, t_start, ax1):
+
+    time = np.arange(len(results[f'agent {str(len(results) - 1)}']['acc pred SF']))
+    acc_SF = results[f'agent {str(len(results) - 1)}']['acc pred SF']
+    acc_LLM = results[f'agent {str(len(results) - 1)}']['acc pred LLM']
+
+    line1, = ax1.plot(time[:t_start], acc_SF[:t_start], color='orange')
+    line2, = ax1.plot(time[:t_start], acc_LLM[:t_start], color='red')
+
+    ax1.legend(['SF', 'LLM'])
+    ax1.set_xlabel('Time')
+    ax1.set_ylabel('[m/s^2]')
+    ax1.set_title('Acceleration')
+
+    return acc_SF, acc_LLM, line1, line2, ax1
 
 def prep_plot_vehicles(results, env, t_start, ax):
 
@@ -139,16 +227,16 @@ def prep_plot_vehicles(results, env, t_start, ax):
             lines[f'line{k} SF'] = \
                 ax.plot(results[f'agent {k}']['x coord pred SF'][t_start],
                         results[f'agent {k}']['y coord pred SF'][t_start],
-                        c="orange", linestyle='--')[0]  # label=f'v0 = {v02} m/s'
+                        c="orange", linestyle='-')[0]  # label=f'v0 = {v02} m/s'
         else:
             lines[f'line{k} traj estimation'] = \
                 ax.plot(results[f'agent {k}']['trajectory estimation x'][t_start],
                         results[f'agent {k}']['trajectory estimation y'][t_start], c="green",
-                        linestyle='--')[0]  # label=f'v0 = {v02} m/s'
+                        linestyle='-')[0]  # label=f'v0 = {v02} m/s'
         lines[f'line{k}'] = \
             ax.plot(results[f'agent {k}']['x coord pred'][t_start], results[f'agent {k}']['y coord pred'][t_start],
                     c="red",
-                    linestyle='--')[0]  # label=f'v0 = {v02} m/s'
+                    linestyle='-')[0]  # label=f'v0 = {v02} m/s'
 
     return vehicles, labels, lines, ax
 
@@ -235,7 +323,7 @@ def plot_vehicles(results, fig, ax, env, t_start, t_end):
 
         return (vehicles, labels, lines)
 
-    ani = FuncAnimation(fig=fig, func=update, frames=t_end-t_start, interval=100, repeat=False)
+    ani = FuncAnimation(fig=fig, func=update, frames=t_end-t_start, interval=50, repeat=False)
 
     path = os.path.join(os.path.dirname(__file__), "..")
     ani.save(path + '/animation/animation.gif', writer='pillow')
@@ -264,7 +352,8 @@ def plot_simulation(env_type, env, results, t_start, t_end):
     ax.set_xlim(env["State space"]["x limits"][0], env["State space"]["x limits"][1])
     ax.set_ylim(env["State space"]["y limits"][0], env["State space"]["y limits"][1])
 
-    plt.show()
+    #plt.show()
+    plt.close(fig)
 
     return ani
 
@@ -347,13 +436,12 @@ def plot_simulation_env_1(env, results, t_start, t_end, fig, ax):
     ax.set_xlim(env["State space"]["x limits"][0], env["State space"]["x limits"][1])
     ax.set_ylim(env["State space"]["y limits"][0], env["State space"]["y limits"][1])
 
-    plt.show()
+    #plt.show()
 
     return ani, ax, fig
 
 def plot_simulation_env_2(env, results, t_start, t_end, fig, ax):
-    time = len(results['agent 0']['x coord'])
-    fig, ax = plt.subplots()
+
     obstacles = env['Road Limits']
     for id in obstacles:
         """if obstacles[id]['radius'][0] != obstacles[id]['radius'][1]:
@@ -383,18 +471,20 @@ def plot_simulation_env_2(env, results, t_start, t_end, fig, ax):
     for id in env['Exits']:
         plt.scatter(env['Exits'][id]['position'][0], env['Exits'][id]['position'][1], color='blue')
 
-    ani = plot_vehicles(results, fig, ax, env, t_start, t_end)
+    if t_start != None:
+        ani = plot_vehicles(results, fig, ax, env, t_start, t_end)
+    else:
+        ani = None
 
     ax.set_xlim(env["State space"]["x limits"][0], env["State space"]["x limits"][1])
     ax.set_ylim(env["State space"]["y limits"][0], env["State space"]["y limits"][1])
 
-    plt.show()
+    #plt.show()
 
     return ani, ax, fig
 
 def plot_simulation_env_3(env, results, t_start, t_end, fig, ax):
-    time = len(results['agent 0']['x coord'])
-    fig, ax = plt.subplots()
+
     obstacles = env['Road Limits']
     for id in obstacles:
         """if obstacles[id]['radius'][0] != obstacles[id]['radius'][1]:
@@ -420,18 +510,20 @@ def plot_simulation_env_3(env, results, t_start, t_end, fig, ax):
     for id in env['Exits']:
         plt.scatter(env['Exits'][id]['position'][0], env['Exits'][id]['position'][1], color='blue')
 
-    ani = plot_vehicles(results, fig, ax, env, t_start, t_end)
+    if t_start != None:
+        ani = plot_vehicles(results, fig, ax, env, t_start, t_end)
+    else:
+        ani = None
 
     ax.set_xlim(env["State space"]["x limits"][0], env["State space"]["x limits"][1])
     ax.set_ylim(env["State space"]["y limits"][0], env["State space"]["y limits"][1])
 
-    plt.show()
+    #plt.show()
 
     return ani, ax, fig
 
 def plot_simulation_env_4(env, results, t_start, t_end, fig, ax):
-    time = len(results['agent 0']['x coord'])
-    fig, ax = plt.subplots()
+
     obstacles = env['Road Limits']
     for id in obstacles:
         """if obstacles[id]['radius'][0] != obstacles[id]['radius'][1]:
@@ -457,18 +549,20 @@ def plot_simulation_env_4(env, results, t_start, t_end, fig, ax):
     for id in env['Exits']:
         plt.scatter(env['Exits'][id]['position'][0], env['Exits'][id]['position'][1], color='blue')
 
-    ani = plot_vehicles(results, fig, ax, env, t_start, t_end)
+    if t_start != None:
+        ani = plot_vehicles(results, fig, ax, env, t_start, t_end)
+    else:
+        ani = None
 
     ax.set_xlim(env["State space"]["x limits"][0], env["State space"]["x limits"][1])
     ax.set_ylim(env["State space"]["y limits"][0], env["State space"]["y limits"][1])
 
-    plt.show()
+    #plt.show()
 
     return ani, ax, fig
 
 def plot_simulation_env_5(env, results, t_start, t_end, fig, ax):
-    time = len(results['agent 0']['x coord'])
-    fig, ax = plt.subplots()
+
     obstacles = env['Road Limits']
     for id in obstacles:
         """if len(obstacles[id]['radius']) > 1:
@@ -498,11 +592,14 @@ def plot_simulation_env_5(env, results, t_start, t_end, fig, ax):
     for id in env['Exits']:
         plt.scatter(env['Exits'][id]['position'][0], env['Exits'][id]['position'][1], color='blue')
 
-    ani = plot_vehicles(results, fig, ax, env, t_start, t_end)
+    if t_start != None:
+        ani = plot_vehicles(results, fig, ax, env, t_start, t_end)
+    else:
+        ani = None
 
     ax.set_xlim(env["State space"]["x limits"][0], env["State space"]["x limits"][1])
     ax.set_ylim(env["State space"]["y limits"][0], env["State space"]["y limits"][1])
 
-    plt.show()
+    #plt.show()
 
     return ani, ax, fig

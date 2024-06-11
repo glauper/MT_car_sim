@@ -3,7 +3,7 @@ import os
 import json
 import random
 from config.config import SimulationConfig, EnviromentConfig
-from functions.plot_functions import input_animation, plot_simulation
+from functions.plot_functions import input_animation, plot_simulation, save_all_frames
 from env_controller import EnvController
 from vehicle import Vehicle
 
@@ -22,3 +22,5 @@ plot_simulation(env['env number'], env, results, t_start=0, t_end=len(results['a
 if env['With LLM car']:
     #plot_input_LLM_and_SF(results)
     input_animation(results,t_start=0, t_end=len(results['agent 0']['x coord']))
+
+    save_all_frames(results, env)

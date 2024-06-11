@@ -8,9 +8,9 @@ import os
 import re
 from functions.plot_functions import (plot_simulation_env_0, plot_simulation_env_1, plot_simulation_env_2,
                                       plot_simulation_env_3, plot_simulation_env_4, plot_simulation_env_5,
-                                      prep_plot_vehicles)
+                                      prep_plot_vehicles, prep_plot_acc_input, prep_plot_steer_input)
 
-st.set_page_config(layout="wide", )
+st.set_page_config(layout="wide")
 
 # Initialize session state for rectangle position and chat history
 if 'results' not in st.session_state:
@@ -45,78 +45,69 @@ if 'change_task' not in st.session_state:
     st.session_state.change_task = True
 if 'figures' not in st.session_state:
     st.session_state.figures = []
-    for t in range(len(results['agent 0']['x coord'])):
-        fig, ax = plt.subplots()
-        if env['env number'] == 0:
-            ani, ax, fig = plot_simulation_env_0(env, results, None, None, fig, ax)
-        elif env['env number'] == 1:
-            ani, ax, fig = plot_simulation_env_1(env, results, None, None, fig, ax)
-        elif env['env number'] == 2:
-            ani, ax, fig = plot_simulation_env_2(env, results, None, None, fig, ax)
-        elif env['env number'] == 3:
-            ani, ax, fig = plot_simulation_env_3(env, results, None, None, fig, ax)
-        elif env['env number'] == 4:
-            ani, ax, fig = plot_simulation_env_4(env, results, None, None, fig, ax)
-        elif env['env number'] == 5:
-            ani, ax, fig = plot_simulation_env_5(env, results, None, None, fig, ax)
-
-        ax.set_aspect('equal')
-
-        vehicles, labels, lines, ax = prep_plot_vehicles(results, env, t, ax)
-
-        ax.set_xlim(env["State space"]["x limits"][0], env["State space"]["x limits"][1])
-        ax.set_ylim(env["State space"]["y limits"][0], env["State space"]["y limits"][1])
-
-        path_fig = os.path.join(os.path.dirname(__file__), ".", f"save_results/images/")
-        fig.savefig(path_fig + f'{t}.png')
-        plt.close(fig)
 
 # Divide the page into two columns
-col1, col2 = st.columns([2,1])
+col1, col2, col3 = st.columns([1.5,1,1])
 
-# Left column: Chat interface
-with col1:
-    new_call = False
-    for k in range(len(messages)):
-        if 'User' in messages[k].keys() and messages[k]['time'] == st.session_state.step:
-            new_call = True
-            if 'Task Planner' in messages[k+1].keys() and messages[k+1]['time'] == st.session_state.step:
-                st.session_state.chat_history.insert(0,{'role': 'User', 'content': messages[k]['User']})
-                message = """
-                """
-                for nr, task in enumerate(messages[k+1]['Task Planner']['tasks']):
-                    message += f'{nr+1}) ' + task + """
-                """
-                st.session_state.chat_history.insert(1, {'role': 'Task Planner','content': message})
-            if 'Optimization Designer' in messages[k+1].keys() and messages[k+1]['time'] == st.session_state.step:
-                st.session_state.chat_history.insert(0,{'role': 'User', 'content': messages[k]['User']})
-                message = """
-                objective = """ + str(messages[k+1]['Optimization Designer']['objective']) + """
-                equality_constraints = """ + str(messages[k + 1]['Optimization Designer']['equality_constraints']) + """
-                inequality_constraints = """ + str(messages[k + 1]['Optimization Designer']['inequality_constraints'])
-                st.session_state.chat_history.insert(1, {'role': 'Optimization Designer', 'content': message})
-
-    # Display chat history
-    for chat_message in st.session_state.chat_history:
-        with st.chat_message(chat_message['role']):
-            if chat_message['role'] == 'User':
-                st.markdown(chat_message['content'], unsafe_allow_html=True)
-                if new_call:
-                    time.sleep(1)
-            elif chat_message['role'] == 'Optimization Designer':
-                st.code(chat_message['content'])
-                if new_call:
-                    time.sleep(1)
-            elif chat_message['role'] == 'Task Planner':
-                st.markdown(chat_message['content'])
-                if new_call:
-                    time.sleep(1)
 
 # Right column: Plot
 with col2:
     st.header(f"Time t = {st.session_state.step}")
-    path_fig = os.path.join(os.path.dirname(__file__), ".", f"save_results/images/")
+    path_fig = os.path.join(os.path.dirname(__file__), ".", f"save_results/images_sim/")
     st.image(path_fig + f'{st.session_state.step}.png')
+
+with col3:
+    path_fig = os.path.join(os.path.dirname(__file__), ".", f"save_results/images_acc/")
+    st.image(path_fig + f'{st.session_state.step}.png')
+    path_fig = os.path.join(os.path.dirname(__file__), ".", f"save_results/images_steer/")
+    st.image(path_fig + f'{st.session_state.step}.png')
+
+# Left column: Chat interface
+with (col1):
+    for k in range(len(messages)):
+        if 'User' in messages[k].keys() and messages[k]['time'] == st.session_state.step:
+            with st.chat_message('User'):
+                message = f'Time t = {st.session_state.step}:\n' + '- ' + messages[k]['User']
+                st.markdown(message, unsafe_allow_html=True)
+                time.sleep(1)
+            if 'Task Planner' in messages[k+1].keys() and messages[k+1]['time'] == st.session_state.step:
+                st.session_state.chat_history.insert(0,{'role': 'User', 'content': message})
+                #message = f"Time t = {st.session_state.step}:\n"
+                message = """"""
+                for nr, task in enumerate(messages[k+1]['Task Planner']['tasks']):
+                    message += f'{nr+1}. ' + task + '\n'
+
+                st.session_state.chat_history.insert(1, {'role': 'Task Planner','content': message})
+                with st.chat_message('Task Planner'):
+                    st.markdown(message)
+                    time.sleep(1)
+            if 'Optimization Designer' in messages[k+1].keys() and messages[k+1]['time'] == st.session_state.step:
+                st.session_state.chat_history.insert(2,{'role': 'User', 'content': message})
+                #message = f"Time t = {st.session_state.step}:\n" + """
+                message = """objective = """ + str(messages[k+1]['Optimization Designer']['objective']) + """
+equality_constraints = """ + str(messages[k + 1]['Optimization Designer']['equality_constraints']) + """
+inequality_constraints = """ + str(messages[k + 1]['Optimization Designer']['inequality_constraints'])
+                st.session_state.chat_history.insert(3, {'role': 'Optimization Designer', 'content': message})
+                with st.chat_message('Optimization Designer'):
+                    st.code(message)
+                    time.sleep(1)
+        if 'Vehicle' in messages[k].keys() and messages[k]['time'] == st.session_state.step:
+            message = f"Time t = {st.session_state.step}:\n" + '- ' + messages[k]['Vehicle']
+            st.session_state.chat_history.insert(0, {'role': 'Vehicle', 'content': message})
+            with st.chat_message('Vehicle'):
+                st.markdown(message, unsafe_allow_html=True)
+                time.sleep(1)
+
+    for chat_message in st.session_state.chat_history:
+        with st.chat_message(chat_message['role']):
+            if chat_message['role'] == 'User':
+                st.markdown(chat_message['content'], unsafe_allow_html=True)
+            elif chat_message['role'] == 'Vehicle':
+                st.markdown(chat_message['content'], unsafe_allow_html=True)
+            elif chat_message['role'] == 'Optimization Designer':
+                st.code(chat_message['content'])
+            elif chat_message['role'] == 'Task Planner':
+                st.markdown(chat_message['content'])
 
 # Rerun the app after a short delay
 time.sleep(0.5)

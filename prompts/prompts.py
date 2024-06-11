@@ -90,10 +90,12 @@ def general_TP_prompt():
 
 def specific_TP_prompt(env, agents, ego, query):
 
-    if env['env number'] == 0 or env['env number'] == 3:
+    if env['env number'] == 0 or env['env number'] == 3 or env['env number'] == 4:
         TP_PROMPT = specific_TP_prompt_env_0(env, agents, ego, query)
     elif env['env number'] == 1:
         TP_PROMPT = specific_TP_prompt_env_1(env, agents, ego, query)
+    elif env['env number'] == 2:
+        TP_PROMPT = specific_TP_prompt_env_2(env, agents, ego, query)
 
     return TP_PROMPT
 
@@ -272,6 +274,91 @@ def specific_TP_prompt_env_1(env, agents, ego, query):
     else:
         return objects + name_agents + description + """Query: """ + query
 
+def specific_TP_prompt_env_2(env, agents, ego, query):
+
+    objects = """
+        objects = ['entry', 'exit', 'final_target']"""
+
+    if ego.entering:
+        description = """
+        Description: You are approaching a road cross with four entrances and four exits. You are coming in the cross from one of the entrances, where the maximum permitted speed is """+str(ego.entry['max vel'])+""" m/s.
+        You are on the main road and can see that the entrances of the road cross on your left and right have stop signals.
+        The entry in the cross of your lane is """+str(round(np.linalg.norm(ego.position - ego.entry['position']), 1))+""" m away and you are moving with a velocity of """+str(round(ego.velocity[0], 1))+""" m/s. The other three entries to the cross are around 12 m away from your entry.
+        There are other """+str(len(agents))+""" agents moving in the region of the road cross.
+        """
+    elif ego.exiting and ego.inside_cross:
+        description = """
+        Description: You are inside a road cross with four entrances and four exits, therefore you can assumed you have already respected the priority and now you have to go to your exit, avoiding collision with other agents. The maximum permitted speed is """ + str(ego.exit['max vel']) + """ m/s.
+        The exit in the cross of your lane is """ + str(round(np.linalg.norm(ego.position - ego.exit['position']), 1)) + """ m away. You are moving with a velocity of """ + str(round(ego.velocity[0],1)) + """ m/s.
+        There are other """ + str(len(agents)) + """ agents moving in the region of the road cross.
+        """
+
+    else:
+        description = """
+        Description: You are leaving the cross, therefore you have only to reach your final_target avoiding collision with other agents. The maximum permitted speed is """ + str(ego.final_target['max vel']) + """ m/s.
+        The final_target in your lane is """ + str(round(np.linalg.norm(ego.position - ego.final_target['position']),1)) + """ m away. You are moving with a velocity of """ + str(round(ego.velocity[0],1)) + """ m/s.
+        There are other """ + str(len(agents)) + """ agents moving in the region of the road cross.
+        """
+
+    name_agents = """
+        agents = ["""
+    for i, id_agent in enumerate(agents):
+        if i == len(agents) - 1:
+            name_agents = name_agents + """'""" + id_agent + """']"""
+        else:
+            name_agents = name_agents + """'""" + id_agent + """', """
+
+        diff_angle = (ego.theta - agents[id_agent].theta) * 180 / np.pi
+        if diff_angle < 0:
+            dir = str(round(abs(diff_angle[0]),1)) + """ degrees counterclockwise"""
+        else:
+            dir = str(round(abs(diff_angle[0]),1)) + """ degrees clockwise"""
+
+        if agents[id_agent].entering:
+            agent_orientation = agents[id_agent].target[2]
+            if agent_orientation > np.pi:
+                agent_orientation = agent_orientation - 2 * np.pi
+            elif agent_orientation <= -np.pi:
+                agent_orientation = agent_orientation + 2 * np.pi
+
+            if agent_orientation == 0:  # coming from the left
+                info_1 = """is coming from the left entrance of the cross with respect to you"""
+            elif agent_orientation == - np.pi / 2:  # coming from the opposite direction
+                info_1 = """is coming from the entrance in front of you"""
+            elif agent_orientation == np.pi:  # coming from the right direction
+                info_1 = """is coming from the right entrance of the cross with respect to you"""
+        elif agents[id_agent].exiting and agents[id_agent].inside_cross:
+            agent_orientation = agents[id_agent].target[2]
+            if agent_orientation > np.pi:
+                agent_orientation = agent_orientation - 2 * np.pi
+            elif agent_orientation <= -np.pi:
+                agent_orientation = agent_orientation + 2 * np.pi
+
+            if agent_orientation == 0:
+                info_1 = """is going to the exit of the cross on your right"""
+            elif agent_orientation == np.pi / 2:
+                info_1 = """is going to the exit of the cross in front of you"""
+            elif agent_orientation == np.pi:
+                info_1 = """is going to the exit of the cross on your left"""
+            elif agent_orientation == - np.pi / 2:
+                info_1 = """is going to the exit of the cross next ot you"""
+        else:
+            info_1 = """is going away from the cross"""
+
+        description = description + """
+        Information for agent """ + str(id_agent) + """:
+            (1) is a """ + agents[id_agent].type + """
+            (2) """ + info_1 + """
+            (3) is """ + str(round(np.linalg.norm(ego.position - agents[id_agent].position),1)) + """ m away from you
+            (4) has a velocity of """ + str(round(agents[id_agent].velocity[0],1)) + """ m/s
+            (5) has a direction of """ + dir + """ with respect to your orientation
+        """
+
+    if ego.exiting and ego.inside_cross == False:
+        return objects + name_agents + description + """Query: go to final_target"""
+    else:
+        return objects + name_agents + description + """Query: """ + query
+
 def general_OD_prompt():
 
     OD_PROMPT = """
@@ -355,7 +442,7 @@ def general_OD_prompt():
 
 def specific_OD_prompt(env_nr, agents):
 
-    if env_nr == 0 or env_nr == 1 or env_nr == 3:
+    if env_nr == 0 or env_nr == 1 or env_nr == 2 or env_nr == 3 or env_nr == 4:
         OD_PROMPT = """
         objects = ['entry', 'exit', 'final_target']
         """

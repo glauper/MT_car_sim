@@ -21,7 +21,7 @@ def sim_init():
     presence_emergency_car = False
     distance = []
     for name_vehicle in agents:
-        if agents[name_vehicle].type == 'emergency_car':
+        if agents[name_vehicle].type == 'emergency car':
             presence_emergency_car = True
             name_emergency_car = name_vehicle
         else:

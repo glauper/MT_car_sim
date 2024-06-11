@@ -1,5 +1,5 @@
 {"env": {
-	"Number Vehicles": 2,
+	"Number Vehicles": 5,
 	"Number Pedestrians": 0,
 	"State space": {
 		"x limits": [-30, 30],
@@ -54,7 +54,7 @@
 
 	"Vehicle Specification": {
 		"types": ["standard car"],
-		"standard_car": {
+		"standard car": {
 			"length": 3,
 			"width": 2,
 			"l_f": 1,
@@ -84,7 +84,7 @@
 			"position 2": [-10, -3]
 		},
 		"1": {
-			"position": [28, 3],
+			"position": [25, 3],
 			"orientation": 180,
 			"speed limit": 2,
 			"offset": [-5, 0],
@@ -92,7 +92,7 @@
 			"waypoints": [[7, 3]]
 		},
 		"2": {
-			"position": [-3, 28],
+			"position": [-3, 22],
 			"orientation": -90,
 			"speed limit": 2,
 			"offset": [0, -5],
@@ -100,7 +100,7 @@
 			"waypoints": [[-3, 7]]
 		},
 		"3": {
-			"position": [-15, -3],
+			"position": [-11, -3],
 			"orientation": 0,
 			"speed limit": 2,
 			"offset": [5, 0],
@@ -117,7 +117,7 @@
 			"waypoints": [[7, 3]]
 		},
 		"5": {
-			"position": [-3, 15],
+			"position": [-3, 16],
 			"orientation": -90,
 			"speed limit": 2,
 			"offset": [0, -5],
@@ -127,25 +127,25 @@
 	},
 	"Exits": {
 		"0": {
-			"position": [-28, 3],
+			"position": [-18, 3],
 			"orientation": 180,
 			"speed limit": 2,
 			"waypoints": [[-6, 3], [-15, 3]]
 		},
 		"1": {
-			"position": [-3, -28],
+			"position": [-3, -18],
 			"orientation": -90,
 			"speed limit": 2,
 			"waypoints": [[-3, -6], [-3, -15]]
 		},
 		"2": {
-			"position": [28, -3],
+			"position": [18, -3],
 			"orientation": 0,
 			"speed limit": 2,
 			"waypoints": [[6, -3], [15, -3]]
 		},
 		"3": {
-			"position": [3, 28],
+			"position": [3, 18],
 			"orientation": 90,
 			"speed limit": 2,
 			"waypoints": [[3, 6], [3, 15]]

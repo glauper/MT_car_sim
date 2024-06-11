@@ -43,8 +43,8 @@ class Vehicle:
             self.A_u[i * 2 + 1, i] = -1
 
         self.b_u = np.zeros((self.m * 2, 1))
-        self.b_u[0, 0] = self.acc_limits[1] * self.delta_t
-        self.b_u[1, 0] = -self.acc_limits[0] * self.delta_t
+        self.b_u[0, 0] = self.acc_limits[1]
+        self.b_u[1, 0] = -self.acc_limits[0]
         self.b_u[2, 0] = self.steering_limits[1] * (np.pi / 180)
         self.b_u[3, 0] = -self.steering_limits[0] * (np.pi / 180)
 
@@ -247,6 +247,47 @@ class Vehicle:
 
         return constraints
 
+    def linear_dynamics_constraints(self, x_next, x_now, u_now):
+        A = np.zeros((self.n, self.n))
+        B = np.zeros((self.n, self.m))
+        u_0 = np.zeros((self.m, 1))
+        beta = np.arctan(self.l_r / (self.l_r + self.l_f) * np.tan(u_0[1]))
+
+        A[0, 0] = 1
+        A[0, 1] = 0
+        A[0, 2] = - self.delta_t * self.velocity * np.sin(self.theta + beta)
+        A[0, 3] = self.delta_t * np.cos(self.theta + beta)
+
+        A[1, 0] = 0
+        A[1, 1] = 1
+        A[1, 2] = self.delta_t * self.velocity * np.cos(self.theta + beta)
+        A[1, 3] = self.delta_t * np.sin(self.theta + beta)
+
+        A[2, 0] = 0
+        A[2, 1] =  0
+        A[2, 2] = 1
+        A[2, 3] = self.delta_t / self.l_r * np.sin(beta)
+
+        A[3, 0] = 0
+        A[3, 1] = 0
+        A[3, 2] = 0
+        A[3, 3] = 1
+
+        B[0, 0] = 0
+        B[1, 0] = 0
+        B[2, 0] = 0
+        B[3, 0] = self.delta_t
+
+        dev_beta = (1 / (1 + (self.l_r / (self.l_r + self.l_f) * np.tan(u_0[1])) ** 2)
+                    * self.l_r / (self.l_r + self.l_f) * 1/(np.cos(u_0[1]) ** 2))
+
+        B[0, 1] = - self.delta_t * self.velocity * np.sin(self.theta + beta) * dev_beta
+        B[1, 1] = self.delta_t * self.velocity * np.cos(self.theta + beta) * dev_beta
+        B[2, 1] = self.delta_t * self.velocity / self.l_r * np.cos(beta) * dev_beta
+        B[3, 1] = 0
+
+        return x_next == A @ x_now + B @ u_now
+
     def init_trackingMPC(self, N):
         self.N = N
         self.Q = np.eye(self.n)
@@ -273,7 +314,7 @@ class Vehicle:
         U = opti.variable(self.m, self.N)
         x_s = opti.variable(self.n, 1)
         u_s = opti.variable(self.m, 1)
-        epsilon = opti.variable(1, 1)
+        #epsilon = opti.variable(1, 1)
 
         cost = 0
         for k in range(self.N):
@@ -290,7 +331,7 @@ class Vehicle:
         diff_X = X[:, -1] - x_s
         diff_target = self.target - x_s
         cost += ca.transpose(diff_X) @ self.P @ diff_X + ca.transpose(diff_target) @ self.T @ diff_target
-        cost += epsilon**2
+        #cost += epsilon**2
 
         # Initial state
         opti.subject_to(X[:, 0] == self.state)
@@ -319,9 +360,9 @@ class Vehicle:
                 diff = X[0:2, k] - ego.previous_opt_sol['X'][0:2, k]
                 # Which of the distance have to keep? mine or of the other one? Or one standard for all
                 if self.security_dist >= ego.security_dist:
-                    opti.subject_to(ca.transpose(diff) @ diff >= self.security_dist ** 2 + epsilon)
+                    opti.subject_to(ca.transpose(diff) @ diff >= self.security_dist ** 2)
                 else:
-                    opti.subject_to(ca.transpose(diff) @ diff >= ego.security_dist ** 2 + epsilon)
+                    opti.subject_to(ca.transpose(diff) @ diff >= ego.security_dist ** 2)
 
         # Obstacle avoidance
         if len(circular_obstacles) != 0:
@@ -334,34 +375,47 @@ class Vehicle:
         opti.minimize(cost)
         # Solve the optimization problem
         if t == 0:  # or agents[f'{i}'].target_status
-            opti.set_initial(X, np.tile(self.state, (1, self.N + 1)).reshape(self.n, self.N + 1))
+            opti.set_initial(X, self.traj_estimation)
             opti.set_initial(U, np.zeros((self.m, self.N)))
-            opti.set_initial(x_s, self.state)
-            opti.set_initial(u_s, np.zeros((self.m, 1)))
+            opti.set_initial(x_s, self.traj_estimation[:, -1])
+            opti.set_initial(u_s, np.array([[0-self.traj_estimation[3, -1]], [0]]))
 
         else:
-            opti.set_initial(X, self.previous_opt_sol['X'])
-            opti.set_initial(U, self.previous_opt_sol['U'])
+            X_guess = np.zeros((self.n, self.N+1))
+            X_guess[:, 0:-2] = self.previous_opt_sol['X'][:, 1:-1]
+            X_guess[:, -1] = self.self.previous_opt_sol['x_s']
+            opti.set_initial(X, X_guess)
+            U_guess = np.zeros((self.m, self.N))
+            U_guess[:, 0:-2] = self.previous_opt_sol['U'][:, 1:-1]
+            U_guess[:, -1] = self.self.previous_opt_sol['u_s']
+            opti.set_initial(U, U_guess)
             opti.set_initial(x_s, self.previous_opt_sol['x_s'])
             opti.set_initial(u_s, self.previous_opt_sol['u_s'])
 
-        opti.solver('ipopt')
-        sol = opti.solve()
+        try:
+            opti.solver('ipopt')
+            sol = opti.solve()
+        except Exception as e:
+            print(f"Optimization failed: {e}")
 
-        stats = opti.stats()
-        exit_flag = stats['success']
+        if opti.stats()['success']:
+            self.previous_opt_sol['X'] = sol.value(X)
+            self.previous_opt_sol['U'] = sol.value(U)
+            self.previous_opt_sol['x_s'] = sol.value(x_s)
+            self.previous_opt_sol['u_s'] = sol.value(u_s)
 
-        if not exit_flag:
-            print('Solution is not optimal')
-            error()
+            input = sol.value(U)[:, 0].reshape((self.m, 1))
 
-        self.previous_opt_sol['X'] = sol.value(X)
-        self.previous_opt_sol['U'] = sol.value(U)
-        self.previous_opt_sol['x_s'] = sol.value(x_s)
-        self.previous_opt_sol['u_s'] = sol.value(u_s)
-        self.previous_opt_sol['Cost'] = sol.value(cost)
+        else:
 
-        input = sol.value(U)[:, 0].reshape((self.m, 1))
+            input = np.zeros((self.m, 1))
+
+            if self.acc_limits[0] > 0 - self.velocity:
+                input[0,:] = self.acc_limits[1]
+            else:
+                input[0, :] = self.velocity/2 - self.velocity
+            input[1, :] = 0
+            print('Other agents MPC solver failed. Use a default u = ', input)
 
         if self.state[2] > 0 and self.target[2] < 0:
             if self.target[2] < self.state[2] - np.pi:
@@ -398,38 +452,46 @@ class Vehicle:
 
         cost = 0
         for k in range(self.N):
-            # LLM cost and constriants
+            # LLM cost and constraints
             cost, opti = self.OD_output(opti, cost, llm, X[:,k], U[:,k], agents)
 
             # State and Input constraints
             opti.subject_to(self.A_x @ X[:, k + 1] <= self.b_x)
             opti.subject_to(self.A_u @ U[:, k] <= self.b_u)
-            opti.subject_to((X[0, k] - self.x) **2 + (X[1, k] - self.y) **2 <= 10 ** 2)
+            #opti.subject_to((X[0, k] - self.x) **2 + (X[1, k] - self.y) **2 <= 10 ** 2)
 
             # System dynamics constraints
             opti.subject_to(self.dynamics_constraints(X[:, k + 1], X[:, k], U[:, k]))
+            #opti.subject_to(self.linear_dynamics_constraints(X[:, k + 1], X[:, k], U[:, k]))
 
         cost, opti = self.OD_output(opti, cost, llm, X[:,-1], U[:,-1], agents) # U[-1] and X[-1] do not corresponds!
-        opti.subject_to(self.A_x @ X[:, -1] <= self.b_x)
-        opti.subject_to((X[0, -1] - self.x) ** 2 + (X[1, -1] - self.y) ** 2 <= 10 ** 2)
-
-        # Stand still for the last state!
-        opti.subject_to(X[3, -1] == 0)
 
         # Initial state
         opti.subject_to(X[:, 0] == self.state)
+
+        rot_matrix = np.array([[np.cos(self.theta), -np.sin(self.theta)],
+                               [np.sin(self.theta), np.cos(self.theta)]])
+        a = 2
+        b = 4
+        M = np.array([[1/a**2, 0], [0, 1/b**2]])
+
+        shift = np.array([[0], [1]])
+        shift = rot_matrix @ shift
 
         # Agents avoidance
         if len(agents) >= 1:
             for k in range(self.N + 1):
                 for id_agent in agents:
-                    diff = X[0:2, k] - agents[id_agent].position
+                    diff = X[0:2, k] - (agents[id_agent].position)
+                    #diff = X[0:2, k] - (shift + agents[id_agent].position)
                     # Which of the distance have to keep? mine or of the other one? Or one standard for all
                     if agents[id_agent].security_dist != 0:
                         if self.security_dist >= agents[id_agent].security_dist:
                             opti.subject_to(ca.transpose(diff) @ diff >= self.security_dist ** 2)
+                            #opti.subject_to(ca.transpose(rot_matrix @ diff) @ M @ (rot_matrix @ diff) >= 1)
                         else:
                             opti.subject_to(ca.transpose(diff) @ diff >= agents[id_agent].security_dist ** 2)
+                            #opti.subject_to(ca.transpose(rot_matrix @ diff) @ M @ (rot_matrix @ diff) >= 1)
 
         """# Obstacle avoidance
         if len(circular_obstacles) != 0:
@@ -442,30 +504,42 @@ class Vehicle:
         opti.minimize(cost)
         # Solve the optimization problem
         if t == 0:  # or agents[f'{i}'].target_status
-            opti.set_initial(X, np.tile(self.state, (1, self.N + 1)).reshape(self.n, self.N + 1))
+            self.trajecotry_estimation()
+            opti.set_initial(X, self.traj_estimation)
             opti.set_initial(U, np.zeros((self.m, self.N)))
 
         else:
-            """opti.set_initial(X, self.previous_opt_sol['X'])
-            opti.set_initial(U, self.previous_opt_sol['U'])"""
-            opti.set_initial(X, np.tile(self.state, (1, self.N + 1)).reshape(self.n, self.N + 1))
+            self.trajecotry_estimation()
+            opti.set_initial(X, self.traj_estimation)
             opti.set_initial(U, np.zeros((self.m, self.N)))
 
-        opti.solver('ipopt')
-        sol = opti.solve()
+        try:
+            opti.solver('ipopt')
+            sol = opti.solve()
+        except Exception as e:
+            print(f"Optimization failed: {e}")
 
-        stats = opti.stats()
-        exit_flag = stats['success']
+        if opti.stats()['success']:
+            self.previous_opt_sol['X'] = sol.value(X)
+            self.previous_opt_sol['U'] = sol.value(U)
+            self.previous_opt_sol['Cost'] = sol.value(cost)
 
-        if not exit_flag:
-            print('Solution is not optimal')
-            error()
+            input = sol.value(U)[:, 0].reshape((self.m, 1))
 
-        self.previous_opt_sol['X'] = sol.value(X)
-        self.previous_opt_sol['U'] = sol.value(U)
-        self.previous_opt_sol['Cost'] = sol.value(cost)
+            self.success_solver_MPC_LLM = True
 
-        input = sol.value(U)[:, 0].reshape((self.m, 1))
+        else:
+
+            input = np.zeros((self.m, 1))
+
+            """if self.acc_limits[0] > 0 - self.velocity:
+                input[0,:] = self.acc_limits[1]
+            else:
+                input[0, :] = 0 - self.velocity
+            input[1, :] = 0"""
+            print('LLM MPC solver failed. Use a default u_L = ', input)
+
+            self.success_solver_MPC_LLM = False
 
         return input
 
@@ -494,7 +568,7 @@ class Vehicle:
 
         return obj, opti
 
-    def SF(self, u_lernt, agents, circular_obstacles, t):
+    def SF(self, u_lernt, agents, circular_obstacles, t, llm):
 
         opti = ca.Opti()
 
@@ -510,10 +584,15 @@ class Vehicle:
             # State and Input constraints
             opti.subject_to(self.A_x @ X[:, k + 1] <= self.b_x)
             opti.subject_to(self.A_u @ U[:, k] <= self.b_u)
-            opti.subject_to((X[0, k] - self.x) ** 2 + (X[1,k] - self.y) ** 2 <= 10 ** 2)
+            #opti.subject_to((X[0, k] - self.x) ** 2 + (X[1,k] - self.y) ** 2 <= 10 ** 2)
+
+            # LLM constraints
+            obj = 0
+            obj, opti = self.OD_output(opti, obj, llm, X[:,k], U[:,k], agents)
 
             # System dynamics constraints
             opti.subject_to(self.dynamics_constraints(X[:, k + 1], X[:, k], U[:, k]))
+            #opti.subject_to(self.linear_dynamics_constraints(X[:, k + 1], X[:, k], U[:, k]))
 
         # Initial state
         opti.subject_to(X[:, 0] == self.state)
@@ -523,8 +602,8 @@ class Vehicle:
             for k in range(self.N_SF + 1):
                 for id_agent in agents:
                     if agents[id_agent].security_dist != 0:
-                        #diff = X[0:2, k] - agents[id_agent].position
-                        diff = X[0:2, k] - agents[id_agent].traj_estimation[0:2, k]
+                        diff = X[0:2, k] - agents[id_agent].position
+                        #diff = X[0:2, k] - agents[id_agent].traj_estimation[0:2, k]
                         # Which of the distance have to keep? mine or of the other one? Or one standard for all
                         if self.security_dist >= agents[id_agent].security_dist:
                             opti.subject_to(ca.transpose(diff) @ diff >= (self.security_dist) ** 2 )
@@ -545,39 +624,56 @@ class Vehicle:
         opti.subject_to(self.dynamics_constraints(x_s, x_s, u_s))
         # Terminal constraints
         opti.subject_to(X[:, -1] == x_s)  # x(N) == x_s
-        opti.subject_to((X[0, -1] - self.x) ** 2 + (X[1, -1] - self.y) ** 2 <= 10 ** 2)
+        #opti.subject_to((X[0, -1] - self.x) ** 2 + (X[1, -1] - self.y) ** 2 <= 10 ** 2)
 
         # Solve the optimization problem
         if t == 0:  # or agents[f'{i}'].target_status
-            opti.set_initial(X, np.tile(self.state, (1, self.N_SF + 1)).reshape(self.n, self.N_SF + 1))
-            opti.set_initial(U, np.zeros((self.m, self.N_SF)))
-            opti.set_initial(x_s, self.state)
-            opti.set_initial(u_s, np.zeros((self.m, 1)))
+            opti.set_initial(X, self.traj_estimation)
+            opti.set_initial(U, np.zeros((self.m, self.N)))
+            opti.set_initial(x_s, self.traj_estimation[:, -1])
+            opti.set_initial(u_s, np.array([[0 - self.traj_estimation[3, -1]], [0]]))
+        else:
+            X_guess = np.zeros((self.n, self.N + 1))
+            X_guess[:, 0:-2] = self.previous_opt_sol['X'][:, 1:-1]
+            X_guess[:, -1] = self.self.previous_opt_sol['x_s']
+            opti.set_initial(X, X_guess)
+            U_guess = np.zeros((self.m, self.N))
+            U_guess[:, 0:-2] = self.previous_opt_sol['U'][:, 1:-1]
+            U_guess[:, -1] = self.self.previous_opt_sol['u_s']
+            opti.set_initial(U, U_guess)
+            opti.set_initial(x_s, self.previous_opt_sol['x_s'])
+            opti.set_initial(u_s, self.previous_opt_sol['u_s'])
+
+        try:
+            opti.solver('ipopt')
+            sol = opti.solve()
+        except Exception as e:
+            print(f"Optimization failed: {e}")
+
+        if opti.stats()['success']:
+            self.previous_opt_sol_SF['X'] = sol.value(X)
+            self.previous_opt_sol_SF['U'] = sol.value(U)
+            self.previous_opt_sol_SF['x_s'] = sol.value(x_s)
+            self.previous_opt_sol_SF['u_s'] = sol.value(u_s)
+            self.previous_opt_sol_SF['Cost'] = sol.value(np.linalg.norm(u_lernt - sol.value(U)[:, 0]) ** 2)
+
+            input = sol.value(U)[:, 0].reshape((self.m, 1))
+
+            self.success_solver_SF = True
 
         else:
-            opti.set_initial(X, self.previous_opt_sol_SF['X'])
-            opti.set_initial(U, self.previous_opt_sol_SF['U'])
-            opti.set_initial(x_s, self.previous_opt_sol_SF['x_s'])
-            opti.set_initial(u_s, self.previous_opt_sol_SF['u_s'])
 
-        opti.solver('ipopt')
-        sol = opti.solve()
+            input = np.zeros((self.m, 1))
 
-        stats = opti.stats()
-        exit_flag = stats['success']
+            if self.acc_limits[0] > 0 - self.velocity:
+                input[0, :] = self.acc_limits[1]
+            else:
+                input[0, :] = 0 - self.velocity
+            input[1, :] = 0
+            print('SF solver failed. Use a default input u = ', input)
 
-        if not exit_flag:
-            print('Solution is not optimal')
-            error()
-
-        self.previous_opt_sol_SF['X'] = sol.value(X)
-        self.previous_opt_sol_SF['U'] = sol.value(U)
-        self.previous_opt_sol_SF['x_s'] = sol.value(x_s)
-        self.previous_opt_sol_SF['u_s'] = sol.value(u_s)
-        self.previous_opt_sol_SF['Cost'] = sol.value(np.linalg.norm(u_lernt - sol.value(U)[:, 0]) ** 2 +
-                                                     np.linalg.norm(sol.value(x_s) - self.previous_opt_sol['X'][:,-1]) ** 2)
-
-        input = sol.value(U)[:, 0].reshape((self.m, 1))
+            self.success_solver_SF = False
+            print('SF solver failed.')
 
         return input
 

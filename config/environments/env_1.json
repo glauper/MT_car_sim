@@ -1,5 +1,5 @@
 {"env": {
-	"Number Vehicles": 2,
+	"Number Vehicles": 4,
 	"Number Pedestrians": 0,
 	"State space": {
 		"x limits": [-30, 30],
@@ -125,25 +125,25 @@
 	},
 	"Exits": {
 		"0": {
-			"position": [-28, 3],
+			"position": [-18, 3],
 			"orientation": 180,
 			"speed limit": 3,
 			"waypoints": [[-6, 3], [-15, 3]]
 		},
 		"1": {
-			"position": [-3, -28],
+			"position": [-3, -18],
 			"orientation": -90,
 			"speed limit": 2,
 			"waypoints": [[-3, -6], [-3, -15]]
 		},
 		"2": {
-			"position": [28, -3],
+			"position": [18, -3],
 			"orientation": 0,
 			"speed limit": 3,
 			"waypoints": [[6, -3], [15, -3]]
 		},
 		"3": {
-			"position": [3, 28],
+			"position": [3, 18],
 			"orientation": 90,
 			"speed limit": 2,
 			"waypoints": [[3, 6], [3, 15]]

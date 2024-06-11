@@ -1,76 +1,10 @@
 import numpy as np
+import time
 import re
 import json
 import os
-import pickle
-import random
-from config.config import SimulationConfig, EnviromentConfig
 from functions.plot_functions import plot_simulation, input_animation
 from functions.sim_initialization import results_update_and_save, sim_init, sim_reload
-from env_controller import EnvController
-from priority_controller import PriorityController
-from vehicle import Vehicle
-from llm import LLM
-
-"""SimulationParam = SimulationConfig()
-delta_t = SimulationParam['Timestep']
-env, circular_obstacles = EnviromentConfig(SimulationParam['Environment'])
-env['env number'] = SimulationParam['Environment']
-env['With LLM car'] = SimulationParam['With LLM car']
-
-agents = agents_init(env, delta_t, SimulationParam)
-
-presence_emergency_car = False
-distance = []
-for name_vehicle in agents:
-    if agents[name_vehicle].type == 'emergency_car':
-        presence_emergency_car = True
-        name_emergency_car = name_vehicle
-    else:
-        distance.append(np.linalg.norm(agents[name_vehicle].position))
-
-order_optimization = list(agents.keys())
-if presence_emergency_car:
-    order_optimization.remove(name_emergency_car)
-pairs = list(zip(order_optimization, distance))
-sorted_pairs = sorted(pairs, key=lambda x: x[1])
-order_optimization = [pair[0] for pair in sorted_pairs]
-if presence_emergency_car:
-    order_optimization.insert(0, name_emergency_car)
-
-if SimulationParam['With LLM car']:
-    type = env['Vehicle Specification']['types'][0]
-    info_vehicle = env['Vehicle Specification'][type]
-    ego_vehicle = Vehicle(type, info_vehicle, delta_t)
-    ego_vehicle.init_system_constraints(env["State space"], env['Ego Entrance']['speed limit'])
-    ego_vehicle.init_state_for_LLM(env, SimulationParam['Query'], SimulationParam['Controller']['Ego']['Horizon'])
-else:
-    ego_vehicle = []
-
-priority = PriorityController(SimulationParam['Controller']['Agents']['Type'], SimulationParam['Environment'], env)
-
-if SimulationParam['With LLM car']:
-    Language_Module = LLM()
-    Language_Module.call_TP(env, SimulationParam['Query'], agents, ego_vehicle)
-
-    agents[str(len(agents))] = ego_vehicle
-    results = results_init(env, agents)
-    agents.pop(str(len(agents)-1))
-    options_entrance = list(env['Entrances'].keys())
-else:
-    results = results_init(env, agents)
-    options_entrance = list(env['Entrances'].keys())
-
-# Save some info to eventually reload the simulation
-with open('reload_sim/SimulationParam.pkl', 'wb') as file:
-    pickle.dump(SimulationParam, file)
-with open('reload_sim/agents.pkl', 'wb') as file:
-    pickle.dump(agents, file)
-with open('reload_sim/ego_vehicle.pkl', 'wb') as file:
-    pickle.dump(ego_vehicle, file)
-if SimulationParam['With LLM car']:
-    with open('reload_sim/Language_Module.pkl', 'wb') as file:
-        pickle.dump(Language_Module, file)"""
 
 (SimulationParam, env, agents, ego_vehicle, Language_Module, presence_emergency_car, order_optimization, priority,
  results, circular_obstacles) = sim_init()
@@ -93,23 +27,28 @@ while run_simulation:
     else:
         results = results_update_and_save(env, agents, results, ego_brake)
 
-    # This is a controller that optimize the trajectory of one agent at time
+    # Controller to decide the trajectory of other agents
     other_agents = {}
     input = {}
     too_near = False
     for name_vehicle in order_optimization:
         id_vehicle = int(name_vehicle)
         if agents[name_vehicle].entering or agents[name_vehicle].exiting:
+            agents[name_vehicle].trajecotry_estimation()
             input[f'agent {id_vehicle}'] = agents[name_vehicle].trackingMPC(other_agents, ego_vehicle, circular_obstacles, t)
             other_agents[name_vehicle] = agents[name_vehicle]
-            agents[name_vehicle].trajecotry_estimation()
-            if np.linalg.norm(ego_vehicle.position - agents[name_vehicle].position) <= min(agents[name_vehicle].security_dist,ego_vehicle.security_dist):
-                print('distance other', np.linalg.norm(ego_vehicle.position - agents[name_vehicle].position))
-                if 'brakes()' in Language_Module.TP['tasks'][Language_Module.task_status]:
-                    too_near = False
-                else:
-                    too_near = True
+            # Here if a vehicle is more near then the security distance from the LLM car, the LLM car will brake and replan
+            #for k in range(5):
+                #if np.linalg.norm(ego_vehicle.position - agents[name_vehicle].traj_estimation[:,k]) <= min(agents[name_vehicle].security_dist,ego_vehicle.security_dist):
+            if SimulationParam['With LLM car']:
+                if np.linalg.norm(ego_vehicle.position - agents[name_vehicle].position) <= min(agents[name_vehicle].security_dist, ego_vehicle.security_dist):
+                    print('distance other', np.linalg.norm(ego_vehicle.position - agents[name_vehicle].position))
+                    if 'brakes()' in Language_Module.TP['tasks'][Language_Module.task_status]:
+                        too_near = False
+                    else:
+                        too_near = True
 
+    # Here all the steps for the LLM car
     if SimulationParam['With LLM car']:
         ego_brake = False
         next_task = False
@@ -149,6 +88,8 @@ while run_simulation:
                 next_task = True
         elif too_near:
             ego_brake = True
+            Language_Module.final_messages.append({'Vehicle': 'brakes() because there is a car too near',
+                                                   'time': t})
             ego_vehicle.previous_opt_sol_SF['Cost'] = 0
             if abs(ego_vehicle.velocity) <= 0.01:
                 next_task = True
@@ -157,36 +98,38 @@ while run_simulation:
             if len(Language_Module.OD) == 0:
                 print('Call OD the first time, for :', Language_Module.TP['tasks'][Language_Module.task_status])
                 Language_Module.call_OD(SimulationParam['Environment'], agents, t)
-                final_messages_path = os.path.join(os.path.dirname(__file__), ".", "prompts/output_LLM/messages.json")
-                with open(final_messages_path, 'w') as file:
-                    json.dump(Language_Module.final_messages, file)
             elif ego_vehicle.t_subtask == 0:
                 print('Call OD for :', Language_Module.TP['tasks'][Language_Module.task_status])
                 Language_Module.recall_OD(SimulationParam['Environment'], agents, t)
-                final_messages_path = os.path.join(os.path.dirname(__file__), ".", "prompts/output_LLM/messages.json")
-                with open(final_messages_path, 'w') as file:
-                    json.dump(Language_Module.final_messages, file)
-
+            # Here MPC with LLM output
             input_ego = ego_vehicle.MPC_LLM(agents, circular_obstacles, t, Language_Module)
+            if not ego_vehicle.success_solver_MPC_LLM:
+                Language_Module.final_messages.append({'Vehicle': 'No success for MPC LLM solver',
+                                                       'time': t})
+
+            # Here SF
             if SimulationParam['Controller']['Ego']['SF']['Active']:
-                input_ego = ego_vehicle.SF(input_ego, agents, circular_obstacles, t)
+                input_ego = ego_vehicle.SF(input_ego, agents, circular_obstacles, t, Language_Module)
                 print('Cost SF ', ego_vehicle.previous_opt_sol_SF['Cost'])
+                if not ego_vehicle.success_solver_SF:
+                    Language_Module.final_messages.append({'Vehicle': 'No success for SF solver',
+                                                           'time': t})
 
             if all(priority.A_p @ ego_vehicle.position <= priority.b_p):
                 ego_vehicle.inside_cross = True
             else:
                 ego_vehicle.inside_cross = False
 
-            # check if the task is finished with the cost of the optimization problem
+            # check if the task is finished, i.e. when LLM car is near enough to a waypoint
             print('Cost LLM ', ego_vehicle.previous_opt_sol['Cost'])
             if 'entry' in Language_Module.TP['tasks'][Language_Module.task_status]:
-                if np.linalg.norm(ego_vehicle.position - ego_vehicle.entry['position']) <= 1:
+                if np.linalg.norm(ego_vehicle.position - ego_vehicle.entry['position']) <= 1.5:
                     next_task = True
             elif 'exit' in Language_Module.TP['tasks'][Language_Module.task_status]:
-                if np.linalg.norm(ego_vehicle.position - ego_vehicle.exit['position']) <= 1:
+                if np.linalg.norm(ego_vehicle.position - ego_vehicle.exit['position']) <= 1.5:
                     next_task = True
             elif 'final_target' in Language_Module.TP['tasks'][Language_Module.task_status]:
-                if np.linalg.norm(ego_vehicle.position - ego_vehicle.final_target['position']) <= 1:
+                if np.linalg.norm(ego_vehicle.position - ego_vehicle.final_target['position']) <= 1.5:
                     next_task = True
                     print('End simulation: because the position of LLM car is near enough to the the final target.')
                     run_simulation = False
@@ -202,7 +145,7 @@ while run_simulation:
     if presence_emergency_car:
         # Dynamics propagation if there is an emergency car
         for id_vehicle, name_vehicle in enumerate(agents):
-            if agents[name_vehicle].type == 'emergency_car':
+            if agents[name_vehicle].type == 'emergency car':
                 agents[name_vehicle].dynamics_propagation(input[f'agent {id_vehicle}'])
             else:
                 agents[name_vehicle].brakes()
@@ -215,6 +158,8 @@ while run_simulation:
                 agents[name_vehicle].brakes()
 
     t += 1
+
+    # Priorities
     if SimulationParam['With LLM car']:
         ego_vehicle.t_subtask += 1
         # I don't think is the best way to do that...
@@ -229,25 +174,41 @@ while run_simulation:
     for name_agent in agents:
         agents[name_agent].update_velocity_limits(env)
 
+    # Check if some flag say that a replan of TP is needed for LLM car
     if SimulationParam['With LLM car']:
         if run_simulation:
             if next_task:
                 print('Call TP: because a task is terminated and a new one begins.')
                 ego_vehicle.t_subtask = 0
                 Language_Module.task_status += 1
-                reason = {'next_task': True, 'SF_kicks_in': False}
+                reason = {'next_task': True, 'SF_kicks_in': False, 'other_agent_too_near': False, 'MPC_LLM_not_solved': False}
                 Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
-                # If safety filter have to correct then we need to replan...how to proceed?
+
             elif SimulationParam['Controller']['Ego']['SF']['Replan']['Active'] and ego_vehicle.previous_opt_sol_SF['Cost'] >= SimulationParam['Controller']['Ego']['SF']['Replan']['toll']:
-                    print('Call TP: because SF cost are high')
-                    ego_vehicle.t_subtask = 0
-                    reason = {'next_task': False, 'SF_kicks_in': True}
-                    Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
+                print('Call TP: because SF cost are high')
+                ego_vehicle.t_subtask = 0
+                reason = {'next_task': False, 'SF_kicks_in': True, 'other_agent_too_near': False, 'MPC_LLM_not_solved': False}
+                Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
+
             elif too_near:
                 print('Call TP: because an agent is to near')
                 ego_vehicle.t_subtask = 0
-                reason = {'next_task': False, 'SF_kicks_in': True}
+                reason = {'next_task': False, 'SF_kicks_in': False, 'other_agent_too_near': True, 'MPC_LLM_not_solved': False}
                 Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
+            elif not ego_vehicle.success_solver_MPC_LLM:
+                print(ego_vehicle.state)
+                print('Call TP: because no success of MPC LLM.')
+                ego_vehicle.t_subtask = 0
+                reason = {'next_task': False, 'SF_kicks_in': False, 'other_agent_too_near': False, 'MPC_LLM_not_solved': True}
+                Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
+                ego_vehicle.success_solver_MPC_LLM = True
+            elif not ego_vehicle.success_solver_SF:
+                print(ego_vehicle.state)
+                print('Call TP: because no success of SF.')
+                ego_vehicle.t_subtask = 0
+                reason = {'next_task': False, 'SF_kicks_in': False, 'other_agent_too_near': False, 'MPC_LLM_not_solved': False, 'SF_not_solved': True}
+                Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
+                ego_vehicle.success_solver_SF = True
 
     else:
         reach_end_target = []
@@ -261,7 +222,7 @@ while run_simulation:
         if all(reach_end_target):
             run_simulation = False
 
-    if t == 200:
+    if t == 400:
         print('End simulation: because max simulation steps are reached.')
         run_simulation = False
 

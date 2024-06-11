@@ -6,8 +6,8 @@ def SimulationConfig():
 
     SimulationParam = {'Save middle results': True,
                        'With LLM car': True,
-                       'Timestep': 0.5, # [s]
-                       'Environment': 1,
+                       'Timestep': 0.1, # [s]
+                       'Environment': 4,
                        'Query': 'go to the exit on the left',
                        'Controller': {
                            'Agents': {
@@ -19,8 +19,8 @@ def SimulationConfig():
                                    'Active': True,
                                    'Horizon': 20,
                                    'Replan': {
-                                       'Active': True,
-                                       'toll': 5
+                                       'Active': False,
+                                       'toll': 10
                                    }
                                },
                                'LLM': {

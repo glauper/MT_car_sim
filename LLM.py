@@ -51,7 +51,7 @@ class LLM:
         if why['next_task']:
             motivation = """You have to replan because the task '""" + self.TP['tasks'][self.task_status-1] + """' is finished. In the next the description of the actual situation.
         """
-        elif why['SF_kicks_in']:
+        elif why['SF_kicks_in'] or why['other_agent_too_near'] or  why['MPC_LLM_not_solved'] or why['SF_not_solved']:
             motivation = """The execution of the task '""" + self.TP['tasks'][self.task_status] + """' is not completed, but you have to replan to ensure that the task can be continued. In the next the description of the actual situation.
         """
 
@@ -72,7 +72,18 @@ class LLM:
             "content": str(self.TP),
         })
 
-        self.final_messages.append({'User': query,
+        if why['next_task']:
+            motivation = """Replan because task finished. Task: """
+        elif why['other_agent_too_near']:
+            motivation = """Replan because other agents is too near. Task: """
+        elif why['SF_kicks_in']:
+            motivation = """Replan because cost SF too high. Task: """
+        elif why['MPC_LLM_not_solved']:
+            motivation = """Replan because MPC LLM no success with solver. Task: """
+        elif why['SF_not_solved']:
+            motivation = """Replan because SF no success with solver. Task: """
+
+        self.final_messages.append({'User': motivation + query,
                                     'time': t})
         self.final_messages.append({'Task Planner': self.TP,
                                     'time': t})
@@ -109,8 +120,11 @@ class LLM:
                                     'time': t})
         self.final_messages.append({'Optimization Designer': self.OD,
                                     'time': t})
+        final_messages_path = os.path.join(os.path.dirname(__file__), ".", "prompts/output_LLM/messages.json")
+        with open(final_messages_path, 'w') as file:
+            json.dump(self.final_messages, file)
 
-        save_OD_path = os.path.join(os.path.dirname(__file__), ".","prompts/output_LLM/OD_output.json")
+        save_OD_path = os.path.join(os.path.dirname(__file__), ".", "prompts/output_LLM/OD_output.json")
         with open(save_OD_path, 'w') as file:
             json.dump(self.OD_messages, file)
 
@@ -136,6 +150,9 @@ class LLM:
                                     'time': t})
         self.final_messages.append({'Optimization Designer': self.OD,
                                     'time': t})
+        final_messages_path = os.path.join(os.path.dirname(__file__), ".", "prompts/output_LLM/messages.json")
+        with open(final_messages_path, 'w') as file:
+            json.dump(self.final_messages, file)
 
         save_OD_path = os.path.join(os.path.dirname(__file__), ".", "prompts/output_LLM/OD_output.json")
         with open(save_OD_path, 'w') as file:
