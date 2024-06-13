@@ -8,7 +8,7 @@ def SimulationConfig():
                        'With LLM car': True,
                        'Timestep': 0.2, # [s]
                        'Environment': 0,
-                       'Query': 'go to the exit on the right',
+                       'Query': 'go to the exit on the left',
                        'Controller': {
                            'Agents': {
                                'Type': "tracking MPC",

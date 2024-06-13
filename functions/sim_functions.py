@@ -335,7 +335,7 @@ def check_crash(ego, agent):
 
     return crash_status
 
-def check_need_replan(ego_vehicle, agents, Language_Module, env, SimulationParam, run_simulation, next_task, too_near, t):
+def check_need_replan(ego_vehicle, agents, Language_Module, env, SimulationParam, run_simulation, next_task, too_near, t, counter):
     # check if the task is finished, i.e. when LLM car is near enough to a waypoint
     print('Cost LLM ', ego_vehicle.previous_opt_sol['Cost'])
     if 'entry' in Language_Module.TP['tasks'][Language_Module.task_status]:
@@ -371,6 +371,7 @@ def check_need_replan(ego_vehicle, agents, Language_Module, env, SimulationParam
             reason = {'next_task': True, 'SF_kicks_in': False, 'other_agent_too_near': False,
                       'MPC_LLM_not_solved': False}
             Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
+            counter['TP calls'] += 1
         elif SimulationParam['Controller']['Ego']['SF']['Replan']['Active'] and ego_vehicle.previous_opt_sol_SF[
             'Cost'] >= SimulationParam['Controller']['Ego']['SF']['Replan']['toll']:
             print('Call TP: because SF cost are high')
@@ -378,12 +379,14 @@ def check_need_replan(ego_vehicle, agents, Language_Module, env, SimulationParam
             reason = {'next_task': False, 'SF_kicks_in': True, 'other_agent_too_near': False,
                       'MPC_LLM_not_solved': False}
             Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
+            counter['TP calls'] += 1
         elif too_near:
             print('Call TP: because an agent is to near')
             ego_vehicle.t_subtask = 0
             reason = {'next_task': False, 'SF_kicks_in': False, 'other_agent_too_near': True,
                       'MPC_LLM_not_solved': False}
             Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
+            counter['TP calls'] += 1
         elif not ego_vehicle.success_solver_MPC_LLM:
             print(ego_vehicle.state)
             print('Call TP: because no success of MPC LLM.')
@@ -391,6 +394,7 @@ def check_need_replan(ego_vehicle, agents, Language_Module, env, SimulationParam
             reason = {'next_task': False, 'SF_kicks_in': False, 'other_agent_too_near': False,
                       'MPC_LLM_not_solved': True}
             Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
+            counter['TP calls'] += 1
             ego_vehicle.success_solver_MPC_LLM = True
         elif not ego_vehicle.success_solver_SF:
             print(ego_vehicle.state)
@@ -399,7 +403,8 @@ def check_need_replan(ego_vehicle, agents, Language_Module, env, SimulationParam
             reason = {'next_task': False, 'SF_kicks_in': False, 'other_agent_too_near': False,
                       'MPC_LLM_not_solved': False, 'SF_not_solved': True}
             Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
+            counter['TP calls'] += 1
             ego_vehicle.success_solver_SF = True
 
-    return run_simulation
+    return run_simulation, counter
 

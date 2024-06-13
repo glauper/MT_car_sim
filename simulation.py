@@ -15,7 +15,13 @@ from functions.sim_functions import (results_update_and_save, sim_init, sim_relo
 t = 0
 run_simulation = True
 ego_brake = False
-crash_count = 0
+counter = {'crash': 0,
+           'TP calls': 1,
+           'OD calls':0,
+           'too_near': 0,
+           'fail solver MPC LLM': 0,
+           'fail solver SF': 0}
+
 while run_simulation:
     print("Simulation time: ", t)
     if SimulationParam['With LLM car']:
@@ -42,12 +48,13 @@ while run_simulation:
             if SimulationParam['With LLM car']:
                 # Here if a vehicle is more near then the security distance from the LLM car, the LLM car will brake and replan
                 if check_proximity(ego_vehicle, agents[name_vehicle]):
+                    counter['too_near'] += 1
                     if 'brakes()' in Language_Module.TP['tasks'][Language_Module.task_status]:
                         too_near = False
                     else:
                         too_near = True
                 if check_crash(ego_vehicle, agents[name_vehicle]):
-                    crash_count += 1
+                    counter['crash'] += 1
 
     # Here all the steps for the LLM car
     if SimulationParam['With LLM car']:
@@ -99,15 +106,17 @@ while run_simulation:
             if len(Language_Module.OD) == 0:
                 print('Call OD the first time, for :', Language_Module.TP['tasks'][Language_Module.task_status])
                 Language_Module.call_OD(SimulationParam['Environment'], agents, t)
+                counter['OD calls'] += 1
             elif ego_vehicle.t_subtask == 0:
                 print('Call OD for :', Language_Module.TP['tasks'][Language_Module.task_status])
                 Language_Module.recall_OD(SimulationParam['Environment'], agents, t)
+                counter['OD calls'] += 1
             # Here MPC with LLM output
             input_ego = ego_vehicle.MPC_LLM(agents, circular_obstacles, t, Language_Module)
             if not ego_vehicle.success_solver_MPC_LLM:
                 Language_Module.final_messages.append({'Vehicle': 'No success for MPC LLM solver',
                                                        'time': t})
-
+                counter['fail solver MPC LLM'] += 1
             # Here SF
             if SimulationParam['Controller']['Ego']['SF']['Active']:
                 input_ego = ego_vehicle.SF(input_ego, agents, circular_obstacles, t, Language_Module)
@@ -115,6 +124,7 @@ while run_simulation:
                 if not ego_vehicle.success_solver_SF:
                     Language_Module.final_messages.append({'Vehicle': 'No success for SF solver',
                                                            'time': t})
+                    counter['fail solver SF'] += 1
 
     if SimulationParam['With LLM car']:
         # Dynamics propagation
@@ -146,8 +156,8 @@ while run_simulation:
         ego_vehicle.t_subtask += 1
         # I don't think is the best way to do that...
         agents[str(len(agents))] = ego_vehicle
-        agents = priority.SwissPriority(agents, order_optimization, SimulationParam['With LLM car'])
-        #agents = priority.NoPriority(agents, order_optimization, SimulationParam['With LLM car'])
+        #agents = priority.SwissPriority(agents, order_optimization, SimulationParam['With LLM car'])
+        agents = priority.NoPriority(agents, order_optimization, SimulationParam['With LLM car'])
         ego_vehicle = agents.pop(str(len(agents)-1))
     else:
         agents = priority.SwissPriority(agents, order_optimization, SimulationParam['With LLM car'])
@@ -158,8 +168,8 @@ while run_simulation:
 
     # Check if some flag say that a replan of TP is needed for LLM car
     if SimulationParam['With LLM car']:
-        run_simulation = check_need_replan(ego_vehicle, agents, Language_Module, env, SimulationParam,
-                                           run_simulation, next_task, too_near, t)
+        run_simulation, counter = check_need_replan(ego_vehicle, agents, Language_Module, env, SimulationParam,
+                                           run_simulation, next_task, too_near, t, counter)
         """# check if the task is finished, i.e. when LLM car is near enough to a waypoint
         print('Cost LLM ', ego_vehicle.previous_opt_sol['Cost'])
         if 'entry' in Language_Module.TP['tasks'][Language_Module.task_status]:
@@ -242,7 +252,15 @@ if SimulationParam['With LLM car']:
     with open(final_messages_path, 'w') as file:
         json.dump(Language_Module.final_messages, file)
 
-print('How many crush: ', crash_count)
+print('How many crash: ', counter['crash'])
+print('How many invasion of security area: ', counter['too_near'])
+print('How many times TP is called: ', counter['TP calls'])
+print('How many times OD is called: ', counter['OD calls'])
+print('How many times solver MPC LLM failed: ', counter['fail solver MPC LLM'])
+print('How many times solver SF failed: ', counter['fail solver SF'])
+path = os.path.join(os.path.dirname(__file__), ".", "save_results/counter.json")
+with open(path, 'w') as file:
+    json.dump(counter, file)
 
 results = results_update_and_save(env, agents, results, ego_brake)
 
