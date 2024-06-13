@@ -364,23 +364,11 @@ class Vehicle:
         if nr_agents >= 1:
             for k in range(self.N + 1):
                 for other_agent in other_agents:
-                    """diff = X[0:2, k] - other_agents[other_agent].previous_opt_sol['X'][0:2, k]
-                    # Which of the distance have to keep? mine or of the other one? Or one standard for all
-                    if self.security_dist >= other_agents[other_agent].security_dist:
-                        opti.subject_to(ca.transpose(diff) @ diff >= self.security_dist ** 2)
-                    else:
-                        opti.subject_to(ca.transpose(diff) @ diff >= other_agents[other_agent].security_dist ** 2)"""
                     opti.subject_to(self.agents_constraints(X[:, k], other_agents[other_agent]) >= 0)
 
         # Avoidance of ego vehicle
         if ego != []:
             for k in range(self.N + 1):
-                """diff = X[0:2, k] - ego.previous_opt_sol['X'][0:2, k]
-                # Which of the distance have to keep? mine or of the other one? Or one standard for all
-                if self.security_dist >= ego.security_dist:
-                    opti.subject_to(ca.transpose(diff) @ diff >= self.security_dist ** 2)
-                else:
-                    opti.subject_to(ca.transpose(diff) @ diff >= ego.security_dist ** 2)"""
                 opti.subject_to(self.agents_constraints(X[:, k], ego) >= 0)
 
         # Obstacle avoidance
@@ -479,44 +467,36 @@ class Vehicle:
 
         cost, opti = self.OD_output(opti, cost, llm, X[:,-1], U[:,-1], agents) # U[-1] and X[-1] do not corresponds!
 
+        # Constraint for the steady state
+        #opti.subject_to(self.dynamics_constraints(X[:,-1], X[:,-1], np.zeros((self.m, 1))))
+
         # Initial state
         opti.subject_to(X[:, 0] == self.state)
 
-        # Agents avoidance
+        # Avoidance other agents
         if len(agents) >= 1:
             for k in range(self.N + 1):
                 for id_agent in agents:
                     if agents[id_agent].security_dist != 0:
-                        """diff = X[0:2, k] - (agents[id_agent].position)
-                        #diff = X[0:2, k] - (shift + agents[id_agent].position)
-                        # Which of the distance have to keep? mine or of the other one? Or one standard for all
-                        if self.security_dist >= agents[id_agent].security_dist:
-                            opti.subject_to(ca.transpose(diff) @ diff >= self.security_dist ** 2)
-                            #opti.subject_to(ca.transpose(rot_matrix @ diff) @ M @ (rot_matrix @ diff) >= 1)
-                        else:
-                            opti.subject_to(ca.transpose(diff) @ diff >= agents[id_agent].security_dist ** 2)
-                            #opti.subject_to(ca.transpose(rot_matrix @ diff) @ M @ (rot_matrix @ diff) >= 1)"""
                         opti.subject_to(self.agents_constraints(X[:, k], agents[id_agent]) >= 0)
 
-        """# Obstacle avoidance
+        # Avoidance fix obstacles
         if len(circular_obstacles) != 0:
             for id_obst in circular_obstacles:
-                for k in range(self.N + 1):
+                for k in range(self.N_SF + 1):
                     diff_x = (X[0, k] - circular_obstacles[id_obst]['center'][0]) ** 2 / (circular_obstacles[id_obst]['r_x']) ** 2
                     diff_y = (X[1, k] - circular_obstacles[id_obst]['center'][1]) ** 2 / (circular_obstacles[id_obst]['r_y']) ** 2
-                    opti.subject_to(diff_x + diff_y >= 1)"""
+                    opti.subject_to(diff_x + diff_y >= 1)
 
         opti.minimize(cost)
         # Solve the optimization problem
-        if t == 0:  # or agents[f'{i}'].target_status
+        if t == 0:
             self.trajecotry_estimation()
             opti.set_initial(X, self.traj_estimation)
             opti.set_initial(U, np.zeros((self.m, self.N)))
-
         else:
-            self.trajecotry_estimation()
-            opti.set_initial(X, self.traj_estimation)
-            opti.set_initial(U, np.zeros((self.m, self.N)))
+            opti.set_initial(X, self.previous_opt_sol_SF['X'])
+            opti.set_initial(U, self.previous_opt_sol_SF['U'])
 
         try:
             opti.solver('ipopt')
@@ -528,18 +508,20 @@ class Vehicle:
             self.previous_opt_sol['X'] = sol.value(X)
             self.previous_opt_sol['U'] = sol.value(U)
             self.previous_opt_sol['Cost'] = sol.value(cost)
-
             input = sol.value(U)[:, 0].reshape((self.m, 1))
-
             self.success_solver_MPC_LLM = True
-
         else:
-
-            #input = np.zeros((self.m, 1))
+            # Previous solution
             input = self.previous_opt_sol['U'][:, 1]
+            # Brake
+            """input = np.zeros((self.m, 1))
+            if self.acc_limits[0] > 0 - self.velocity:
+                input[0, :] = self.acc_limits[1]
+            else:
+                input[0, :] = 0 - self.velocity
+            input[1, :] = 0"""
 
             print('LLM MPC solver failed. Use a default u_L = ', input)
-
             self.success_solver_MPC_LLM = False
 
         return input
@@ -603,13 +585,6 @@ class Vehicle:
             for k in range(self.N_SF + 1):
                 for id_agent in agents:
                     if agents[id_agent].security_dist != 0:
-                        """diff = X[0:2, k] - agents[id_agent].position
-                        #diff = X[0:2, k] - agents[id_agent].traj_estimation[0:2, k]
-                        # Which of the distance have to keep? mine or of the other one? Or one standard for all
-                        if self.security_dist >= agents[id_agent].security_dist:
-                            opti.subject_to(ca.transpose(diff) @ diff >= (self.security_dist) ** 2 )
-                        else:
-                            opti.subject_to(ca.transpose(diff) @ diff >= (agents[id_agent].security_dist) ** 2)"""
                         opti.subject_to(self.agents_constraints(X[:, k], agents[id_agent]) >= 0)
 
 
@@ -642,12 +617,6 @@ class Vehicle:
             opti.set_initial(x_s, self.previous_opt_sol_SF['x_s'])
             opti.set_initial(u_s, self.previous_opt_sol_SF['u_s'])
 
-            """self.trajecotry_estimation()
-            opti.set_initial(X, self.traj_estimation)
-            opti.set_initial(U, np.zeros((self.m, self.N)))
-            opti.set_initial(x_s, self.traj_estimation[:, -1])
-            opti.set_initial(u_s, np.array([[0 - self.traj_estimation[3, -1]], [0]]))"""
-
         try:
             opti.solver('ipopt')
             sol = opti.solve()
@@ -662,21 +631,17 @@ class Vehicle:
             self.previous_opt_sol_SF['Cost'] = sol.value(np.linalg.norm(u_lernt - sol.value(U)[:, 0]) ** 2)
 
             input = sol.value(U)[:, 0].reshape((self.m, 1))
-
             self.success_solver_SF = True
 
         else:
-
             input = np.zeros((self.m, 1))
-
             if self.acc_limits[0] > 0 - self.velocity:
                 input[0, :] = self.acc_limits[1]
             else:
                 input[0, :] = 0 - self.velocity
             input[1, :] = 0
-            print('SF solver failed. Use a default input u = ', input)
 
+            print('SF solver failed. Use a default input u = ', input)
             self.success_solver_SF = False
-            print('SF solver failed.')
 
         return input
