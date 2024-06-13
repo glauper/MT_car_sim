@@ -6,9 +6,9 @@ def SimulationConfig():
 
     SimulationParam = {'Save middle results': True,
                        'With LLM car': True,
-                       'Timestep': 0.1, # [s]
-                       'Environment': 4,
-                       'Query': 'go to the exit on the left',
+                       'Timestep': 0.2, # [s]
+                       'Environment': 0,
+                       'Query': 'go to the exit on the right',
                        'Controller': {
                            'Agents': {
                                'Type': "tracking MPC",

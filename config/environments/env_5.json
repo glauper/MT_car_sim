@@ -59,13 +59,15 @@
 
 	"Vehicle Specification": {
 		"types": ["standard car"],
-		"standard_car": {
+		"standard car": {
 			"length": 3,
 			"width": 2,
 			"l_f": 1,
 			"l_r": 1,
 			"security distance": 3,
-			"velocity limits": [-3, 33],
+			"a security dist": 4,
+			"b security dist": 3,
+			"velocity limits": [-1, 33],
 			"acceleration limits": [-3, 3],
 			"steering angle limits": [-60, 60]
 		}

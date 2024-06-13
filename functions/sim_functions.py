@@ -1,4 +1,5 @@
 import numpy as np
+from shapely.geometry import Polygon
 import random
 import os
 import json
@@ -281,3 +282,124 @@ def normalize_angle(angle):
     if normalized_angle > np.pi:
         normalized_angle -= 2 * np.pi
     return normalized_angle
+
+def check_proximity(ego, agent):
+    too_near = False
+
+    R_agent = np.zeros((2, 2))
+    R_agent[0, 0] = np.cos(agent.theta)
+    R_agent[0, 1] = -np.sin(agent.theta)
+    R_agent[1, 0] = np.sin(agent.theta)
+    R_agent[1, 1] = np.cos(agent.theta)
+
+    #V_agent = R_agent @ np.array([[1.5], [0]])
+    #diff = R_agent @ (ego.position - (agent.position + V_agent))
+    diff = R_agent @ (ego.position - agent.position)
+
+    if (diff[0] / agent.a_security_dist) ** 2 + (diff[1] / agent.b_security_dist) ** 2 <= 1:
+        too_near = True
+
+    return too_near
+
+def check_crash(ego, agent):
+
+    R_agent = np.zeros((2, 2))
+    R_agent[0, 0] = np.cos(agent.theta)
+    R_agent[0, 1] = -np.sin(agent.theta)
+    R_agent[1, 0] = np.sin(agent.theta)
+    R_agent[1, 1] = np.cos(agent.theta)
+
+    point_1 = agent.position + R_agent @ np.array([agent.length / 2, -agent.width / 2]).reshape((2,1))
+    point_2 = agent.position + R_agent @ np.array([agent.length / 2, agent.width / 2]).reshape((2, 1))
+    point_3 = agent.position + R_agent @ np.array([-agent.length / 2, agent.width / 2]).reshape((2, 1))
+    point_4 = agent.position + R_agent @ np.array([-agent.length / 2, -agent.width / 2]).reshape((2, 1))
+
+    vertices = [point_1, point_2, point_3, point_4]
+    poly_agent = Polygon(vertices)
+
+    R_ego = np.zeros((2, 2))
+    R_ego[0, 0] = np.cos(ego.theta)
+    R_ego[0, 1] = -np.sin(ego.theta)
+    R_ego[1, 0] = np.sin(ego.theta)
+    R_ego[1, 1] = np.cos(ego.theta)
+
+    point_1 = ego.position + R_ego @ np.array([ego.length / 2, -ego.width / 2]).reshape((2, 1))
+    point_2 = ego.position + R_ego @ np.array([ego.length / 2, ego.width / 2]).reshape((2, 1))
+    point_3 = ego.position + R_ego @ np.array([-ego.length / 2, ego.width / 2]).reshape((2, 1))
+    point_4 = ego.position + R_ego @ np.array([-ego.length / 2, -ego.width / 2]).reshape((2, 1))
+
+    vertices = [point_1, point_2, point_3, point_4]
+    poly_ego = Polygon(vertices)
+
+    crash_status = poly_agent.intersects(poly_ego)
+
+    return crash_status
+
+def check_need_replan(ego_vehicle, agents, Language_Module, env, SimulationParam, run_simulation, next_task, too_near, t):
+    # check if the task is finished, i.e. when LLM car is near enough to a waypoint
+    print('Cost LLM ', ego_vehicle.previous_opt_sol['Cost'])
+    if 'entry' in Language_Module.TP['tasks'][Language_Module.task_status]:
+        ego_vehicle.inside_cross = False
+        if ego_vehicle.entering == False:
+            ego_vehicle.entering = True
+            ego_vehicle.exiting = False
+        if np.linalg.norm(ego_vehicle.position - ego_vehicle.entry['position']) <= 1:
+            next_task = True
+    elif 'exit' in Language_Module.TP['tasks'][Language_Module.task_status]:
+        ego_vehicle.inside_cross = True
+        if ego_vehicle.exiting == False:
+            ego_vehicle.entering = False
+            ego_vehicle.exiting = True
+            ego_vehicle.target = ego_vehicle.waypoints_exiting.pop(0)
+        if np.linalg.norm(ego_vehicle.position - ego_vehicle.exit['position']) <= 1:
+            next_task = True
+    elif 'final_target' in Language_Module.TP['tasks'][Language_Module.task_status]:
+        ego_vehicle.inside_cross = False
+        if ego_vehicle.exiting == False:
+            ego_vehicle.entering = False
+            ego_vehicle.exiting = True
+        if np.linalg.norm(ego_vehicle.position - ego_vehicle.final_target['position']) <= 1:
+            next_task = True
+            print('End simulation: because the position of LLM car is near enough to the the final target.')
+            run_simulation = False
+
+    if run_simulation:
+        if next_task:
+            print('Call TP: because a task is terminated and a new one begins.')
+            ego_vehicle.t_subtask = 0
+            Language_Module.task_status += 1
+            reason = {'next_task': True, 'SF_kicks_in': False, 'other_agent_too_near': False,
+                      'MPC_LLM_not_solved': False}
+            Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
+        elif SimulationParam['Controller']['Ego']['SF']['Replan']['Active'] and ego_vehicle.previous_opt_sol_SF[
+            'Cost'] >= SimulationParam['Controller']['Ego']['SF']['Replan']['toll']:
+            print('Call TP: because SF cost are high')
+            ego_vehicle.t_subtask = 0
+            reason = {'next_task': False, 'SF_kicks_in': True, 'other_agent_too_near': False,
+                      'MPC_LLM_not_solved': False}
+            Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
+        elif too_near:
+            print('Call TP: because an agent is to near')
+            ego_vehicle.t_subtask = 0
+            reason = {'next_task': False, 'SF_kicks_in': False, 'other_agent_too_near': True,
+                      'MPC_LLM_not_solved': False}
+            Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
+        elif not ego_vehicle.success_solver_MPC_LLM:
+            print(ego_vehicle.state)
+            print('Call TP: because no success of MPC LLM.')
+            ego_vehicle.t_subtask = 0
+            reason = {'next_task': False, 'SF_kicks_in': False, 'other_agent_too_near': False,
+                      'MPC_LLM_not_solved': True}
+            Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
+            ego_vehicle.success_solver_MPC_LLM = True
+        elif not ego_vehicle.success_solver_SF:
+            print(ego_vehicle.state)
+            print('Call TP: because no success of SF.')
+            ego_vehicle.t_subtask = 0
+            reason = {'next_task': False, 'SF_kicks_in': False, 'other_agent_too_near': False,
+                      'MPC_LLM_not_solved': False, 'SF_not_solved': True}
+            Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
+            ego_vehicle.success_solver_SF = True
+
+    return run_simulation
+

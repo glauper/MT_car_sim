@@ -11,6 +11,8 @@ class Vehicle:
         self.l_r = info_vehicle['l_r']
         self.l_f = info_vehicle['l_f']
         self.security_dist = info_vehicle['security distance']
+        self.a_security_dist = info_vehicle['a security dist']
+        self.b_security_dist = info_vehicle['b security dist']
         self.vel_limits = info_vehicle['velocity limits']
         self.acc_limits = info_vehicle['acceleration limits']
         self.steering_limits = info_vehicle['steering angle limits']
@@ -191,8 +193,8 @@ class Vehicle:
             point[0, 0] = env['Exits'][key_target]['waypoints'][i][0]
             point[1, 0] = env['Exits'][key_target]['waypoints'][i][1]
             point[2, 0] = env['Exits'][key_target]['orientation'] * (np.pi / 180)
-            point[3, 0] = env['Exits'][key_target]['speed limit']
-            #point[3, 0] = 0
+            #point[3, 0] = env['Exits'][key_target]['speed limit']
+            point[3, 0] = 0
             self.waypoints_exiting.append(point)
 
         self.waypoints_exiting.append(target)
@@ -247,6 +249,23 @@ class Vehicle:
 
         return constraints
 
+    def agents_constraints(self, X, agent):
+
+        R_agent = np.zeros((2,2))
+        R_agent[0, 0] = np.cos(agent.theta)
+        R_agent[0, 1] = -np.sin(agent.theta)
+        R_agent[1, 0] = np.sin(agent.theta)
+        R_agent[1, 1] = np.cos(agent.theta)
+
+        #V_agent = R_agent @ np.array([[1.5], [0]])
+        #diff = R_agent @ (X[0:2] - (agent.position + V_agent))
+
+        diff = R_agent @ (X[0:2] - agent.position)
+
+        constraint = (diff[0] / agent.a_security_dist) ** 2 +(diff[1] / agent.b_security_dist) ** 2 - 1
+
+        return constraint
+
     def linear_dynamics_constraints(self, x_next, x_now, u_now):
         A = np.zeros((self.n, self.n))
         B = np.zeros((self.n, self.m))
@@ -264,7 +283,7 @@ class Vehicle:
         A[1, 3] = self.delta_t * np.sin(self.theta + beta)
 
         A[2, 0] = 0
-        A[2, 1] =  0
+        A[2, 1] = 0
         A[2, 2] = 1
         A[2, 3] = self.delta_t / self.l_r * np.sin(beta)
 
@@ -292,8 +311,8 @@ class Vehicle:
         self.N = N
         self.Q = np.eye(self.n)
         self.R = np.eye(self.m)
-        self.P = 10
-        self.T = 10 * self.P
+        self.P = 100
+        self.T = 100 * self.P
         self.previous_opt_sol = {}
         self.previous_opt_sol['X'] = np.tile(self.state, (1, self.N + 1)).reshape(self.n, self.N + 1)
         self.previous_opt_sol['U'] = np.zeros((self.m, self.N))
@@ -314,7 +333,6 @@ class Vehicle:
         U = opti.variable(self.m, self.N)
         x_s = opti.variable(self.n, 1)
         u_s = opti.variable(self.m, 1)
-        #epsilon = opti.variable(1, 1)
 
         cost = 0
         for k in range(self.N):
@@ -331,7 +349,6 @@ class Vehicle:
         diff_X = X[:, -1] - x_s
         diff_target = self.target - x_s
         cost += ca.transpose(diff_X) @ self.P @ diff_X + ca.transpose(diff_target) @ self.T @ diff_target
-        #cost += epsilon**2
 
         # Initial state
         opti.subject_to(X[:, 0] == self.state)
@@ -347,22 +364,24 @@ class Vehicle:
         if nr_agents >= 1:
             for k in range(self.N + 1):
                 for other_agent in other_agents:
-                    diff = X[0:2, k] - other_agents[other_agent].previous_opt_sol['X'][0:2, k]
+                    """diff = X[0:2, k] - other_agents[other_agent].previous_opt_sol['X'][0:2, k]
                     # Which of the distance have to keep? mine or of the other one? Or one standard for all
                     if self.security_dist >= other_agents[other_agent].security_dist:
                         opti.subject_to(ca.transpose(diff) @ diff >= self.security_dist ** 2)
                     else:
-                        opti.subject_to(ca.transpose(diff) @ diff >= other_agents[other_agent].security_dist ** 2)
+                        opti.subject_to(ca.transpose(diff) @ diff >= other_agents[other_agent].security_dist ** 2)"""
+                    opti.subject_to(self.agents_constraints(X[:, k], other_agents[other_agent]) >= 0)
 
         # Avoidance of ego vehicle
         if ego != []:
             for k in range(self.N + 1):
-                diff = X[0:2, k] - ego.previous_opt_sol['X'][0:2, k]
+                """diff = X[0:2, k] - ego.previous_opt_sol['X'][0:2, k]
                 # Which of the distance have to keep? mine or of the other one? Or one standard for all
                 if self.security_dist >= ego.security_dist:
                     opti.subject_to(ca.transpose(diff) @ diff >= self.security_dist ** 2)
                 else:
-                    opti.subject_to(ca.transpose(diff) @ diff >= ego.security_dist ** 2)
+                    opti.subject_to(ca.transpose(diff) @ diff >= ego.security_dist ** 2)"""
+                opti.subject_to(self.agents_constraints(X[:, k], ego) >= 0)
 
         # Obstacle avoidance
         if len(circular_obstacles) != 0:
@@ -381,14 +400,8 @@ class Vehicle:
             opti.set_initial(u_s, np.array([[0-self.traj_estimation[3, -1]], [0]]))
 
         else:
-            X_guess = np.zeros((self.n, self.N+1))
-            X_guess[:, 0:-2] = self.previous_opt_sol['X'][:, 1:-1]
-            X_guess[:, -1] = self.self.previous_opt_sol['x_s']
-            opti.set_initial(X, X_guess)
-            U_guess = np.zeros((self.m, self.N))
-            U_guess[:, 0:-2] = self.previous_opt_sol['U'][:, 1:-1]
-            U_guess[:, -1] = self.self.previous_opt_sol['u_s']
-            opti.set_initial(U, U_guess)
+            opti.set_initial(X, self.previous_opt_sol['X'])
+            opti.set_initial(U, self.previous_opt_sol['U'])
             opti.set_initial(x_s, self.previous_opt_sol['x_s'])
             opti.set_initial(u_s, self.previous_opt_sol['u_s'])
 
@@ -469,29 +482,21 @@ class Vehicle:
         # Initial state
         opti.subject_to(X[:, 0] == self.state)
 
-        rot_matrix = np.array([[np.cos(self.theta), -np.sin(self.theta)],
-                               [np.sin(self.theta), np.cos(self.theta)]])
-        a = 2
-        b = 4
-        M = np.array([[1/a**2, 0], [0, 1/b**2]])
-
-        shift = np.array([[0], [1]])
-        shift = rot_matrix @ shift
-
         # Agents avoidance
         if len(agents) >= 1:
             for k in range(self.N + 1):
                 for id_agent in agents:
-                    diff = X[0:2, k] - (agents[id_agent].position)
-                    #diff = X[0:2, k] - (shift + agents[id_agent].position)
-                    # Which of the distance have to keep? mine or of the other one? Or one standard for all
                     if agents[id_agent].security_dist != 0:
+                        """diff = X[0:2, k] - (agents[id_agent].position)
+                        #diff = X[0:2, k] - (shift + agents[id_agent].position)
+                        # Which of the distance have to keep? mine or of the other one? Or one standard for all
                         if self.security_dist >= agents[id_agent].security_dist:
                             opti.subject_to(ca.transpose(diff) @ diff >= self.security_dist ** 2)
                             #opti.subject_to(ca.transpose(rot_matrix @ diff) @ M @ (rot_matrix @ diff) >= 1)
                         else:
                             opti.subject_to(ca.transpose(diff) @ diff >= agents[id_agent].security_dist ** 2)
-                            #opti.subject_to(ca.transpose(rot_matrix @ diff) @ M @ (rot_matrix @ diff) >= 1)
+                            #opti.subject_to(ca.transpose(rot_matrix @ diff) @ M @ (rot_matrix @ diff) >= 1)"""
+                        opti.subject_to(self.agents_constraints(X[:, k], agents[id_agent]) >= 0)
 
         """# Obstacle avoidance
         if len(circular_obstacles) != 0:
@@ -530,13 +535,9 @@ class Vehicle:
 
         else:
 
-            input = np.zeros((self.m, 1))
+            #input = np.zeros((self.m, 1))
+            input = self.previous_opt_sol['U'][:, 1]
 
-            """if self.acc_limits[0] > 0 - self.velocity:
-                input[0,:] = self.acc_limits[1]
-            else:
-                input[0, :] = 0 - self.velocity
-            input[1, :] = 0"""
             print('LLM MPC solver failed. Use a default u_L = ', input)
 
             self.success_solver_MPC_LLM = False
@@ -602,13 +603,15 @@ class Vehicle:
             for k in range(self.N_SF + 1):
                 for id_agent in agents:
                     if agents[id_agent].security_dist != 0:
-                        diff = X[0:2, k] - agents[id_agent].position
+                        """diff = X[0:2, k] - agents[id_agent].position
                         #diff = X[0:2, k] - agents[id_agent].traj_estimation[0:2, k]
                         # Which of the distance have to keep? mine or of the other one? Or one standard for all
                         if self.security_dist >= agents[id_agent].security_dist:
                             opti.subject_to(ca.transpose(diff) @ diff >= (self.security_dist) ** 2 )
                         else:
-                            opti.subject_to(ca.transpose(diff) @ diff >= (agents[id_agent].security_dist) ** 2)
+                            opti.subject_to(ca.transpose(diff) @ diff >= (agents[id_agent].security_dist) ** 2)"""
+                        opti.subject_to(self.agents_constraints(X[:, k], agents[id_agent]) >= 0)
+
 
         # Obstacle avoidance
         if len(circular_obstacles) != 0:
@@ -628,21 +631,22 @@ class Vehicle:
 
         # Solve the optimization problem
         if t == 0:  # or agents[f'{i}'].target_status
+            self.trajecotry_estimation()
             opti.set_initial(X, self.traj_estimation)
             opti.set_initial(U, np.zeros((self.m, self.N)))
             opti.set_initial(x_s, self.traj_estimation[:, -1])
             opti.set_initial(u_s, np.array([[0 - self.traj_estimation[3, -1]], [0]]))
         else:
-            X_guess = np.zeros((self.n, self.N + 1))
-            X_guess[:, 0:-2] = self.previous_opt_sol['X'][:, 1:-1]
-            X_guess[:, -1] = self.self.previous_opt_sol['x_s']
-            opti.set_initial(X, X_guess)
-            U_guess = np.zeros((self.m, self.N))
-            U_guess[:, 0:-2] = self.previous_opt_sol['U'][:, 1:-1]
-            U_guess[:, -1] = self.self.previous_opt_sol['u_s']
-            opti.set_initial(U, U_guess)
-            opti.set_initial(x_s, self.previous_opt_sol['x_s'])
-            opti.set_initial(u_s, self.previous_opt_sol['u_s'])
+            opti.set_initial(X, self.previous_opt_sol_SF['X'])
+            opti.set_initial(U, self.previous_opt_sol_SF['U'])
+            opti.set_initial(x_s, self.previous_opt_sol_SF['x_s'])
+            opti.set_initial(u_s, self.previous_opt_sol_SF['u_s'])
+
+            """self.trajecotry_estimation()
+            opti.set_initial(X, self.traj_estimation)
+            opti.set_initial(U, np.zeros((self.m, self.N)))
+            opti.set_initial(x_s, self.traj_estimation[:, -1])
+            opti.set_initial(u_s, np.array([[0 - self.traj_estimation[3, -1]], [0]]))"""
 
         try:
             opti.solver('ipopt')
@@ -676,7 +680,3 @@ class Vehicle:
             print('SF solver failed.')
 
         return input
-
-
-
-

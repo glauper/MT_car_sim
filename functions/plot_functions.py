@@ -22,7 +22,7 @@ def save_all_frames(results, env):
 
         ax.set_aspect('equal')
 
-        vehicles, labels, lines, ax = prep_plot_vehicles(results, env, t, ax)
+        vehicles, labels, lines, ellipses, ax = prep_plot_vehicles(results, env, t, ax)
 
         ax.set_xlim(env["State space"]["x limits"][0], env["State space"]["x limits"][1])
         ax.set_ylim(env["State space"]["y limits"][0], env["State space"]["y limits"][1])
@@ -184,6 +184,7 @@ def prep_plot_vehicles(results, env, t_start, ax):
 
     vehicles = {}
     labels = {}
+    ellipses = {}
     for id_agent in range(len(results)):
         if results[f'agent {id_agent}']['type'] in env['Vehicle Specification']['types']:
             L = env['Vehicle Specification'][results[f'agent {id_agent}']['type']]['length']
@@ -220,6 +221,14 @@ def prep_plot_vehicles(results, env, t_start, ax):
                                                     ha='center', va='center', color='white')
             ax.add_patch(vehicles[f'{id_agent}'])
 
+            shift = np.array([[np.cos(results[f'agent {id_agent}']['theta'][t_start]) * 1.5],
+                              [np.sin(results[f'agent {id_agent}']['theta'][t_start]) * 1.5]])
+
+            ellipses[f'{id_agent}'] = patches.Ellipse((results[f'agent {id_agent}']['x coord'][t_start],
+                                       results[f'agent {id_agent}']['y coord'][t_start]), 8, 6, angle=angle,
+                                       edgecolor='black', linestyle='--', linewidth=1, facecolor='none')
+            ax.add_patch(ellipses[f'{id_agent}'])
+
     lines = {}
     # scats = {}
     for k in range(len(results)):
@@ -231,14 +240,12 @@ def prep_plot_vehicles(results, env, t_start, ax):
         else:
             lines[f'line{k} traj estimation'] = \
                 ax.plot(results[f'agent {k}']['trajectory estimation x'][t_start],
-                        results[f'agent {k}']['trajectory estimation y'][t_start], c="green",
-                        linestyle='-')[0]  # label=f'v0 = {v02} m/s'
+                        results[f'agent {k}']['trajectory estimation y'][t_start], c="green", linestyle='-')[0]  # label=f'v0 = {v02} m/s'
         lines[f'line{k}'] = \
             ax.plot(results[f'agent {k}']['x coord pred'][t_start], results[f'agent {k}']['y coord pred'][t_start],
-                    c="red",
-                    linestyle='-')[0]  # label=f'v0 = {v02} m/s'
+                    c="red", linestyle='-')[0]  # label=f'v0 = {v02} m/s'
 
-    return vehicles, labels, lines, ax
+    return vehicles, labels, lines, ellipses, ax
 
 def plot_vehicles(results, fig, ax, env, t_start, t_end):
     """vehicles = {}
@@ -295,10 +302,11 @@ def plot_vehicles(results, fig, ax, env, t_start, t_end):
         # scats[f'line{k}'] = ax.scatter(results[f'agent {k}']['x coord'][0], results[f'agent {k}']['y coord'][0], c="r", s=5, label=f'car_{k + 1}')
     """
 
-    vehicles, labels, lines, ax = prep_plot_vehicles(results, env, t_start, ax)
+    vehicles, labels, lines, ellipses, ax = prep_plot_vehicles(results, env, t_start, ax)
     def update(frame):
 
         for id_agent in vehicles:
+            # Rectangle
             x = results[f'agent {id_agent}']['x coord'][t_start+frame] - \
                 env['Vehicle Specification'][results[f'agent {id_agent}']['type']]['length'] / 2
             y = results[f'agent {id_agent}']['y coord'][t_start+frame] - \
@@ -307,9 +315,11 @@ def plot_vehicles(results, fig, ax, env, t_start, t_end):
             data = np.stack([x, y]).T
             vehicles[f'{id_agent}'].set_xy(data)
             vehicles[f'{id_agent}'].set_angle(angle)
+            #Labels of Rectangle
             data = np.stack(
                 [results[f'agent {id_agent}']['x coord'][t_start+frame], results[f'agent {id_agent}']['y coord'][t_start+frame]]).T
             labels[f'{id_agent}'].set_position(data)
+            #Trajectories predicted
             if env['With LLM car'] and id_agent == str(len(results) - 1):
                 lines[f'line{id_agent} SF'].set_xdata(results[f'agent {id_agent}']['x coord pred SF'][t_start+frame])
                 lines[f'line{id_agent} SF'].set_ydata(results[f'agent {id_agent}']['y coord pred SF'][t_start+frame])
@@ -320,8 +330,16 @@ def plot_vehicles(results, fig, ax, env, t_start, t_end):
                     results[f'agent {id_agent}']['trajectory estimation y'][t_start+frame])
             lines[f'line{id_agent}'].set_xdata(results[f'agent {id_agent}']['x coord pred'][t_start+frame])
             lines[f'line{id_agent}'].set_ydata(results[f'agent {id_agent}']['y coord pred'][t_start+frame])
+            #Security areas -> ellipsoid
+            shift = np.array([[np.cos(results[f'agent {id_agent}']['theta'][t_start + frame]) * 1.5],
+                              [np.sin(results[f'agent {id_agent}']['theta'][t_start + frame]) * 1.5]])
+            x = results[f'agent {id_agent}']['x coord'][t_start + frame]
+            y = results[f'agent {id_agent}']['y coord'][t_start + frame]
+            angle = results[f'agent {id_agent}']['theta'][t_start + frame] * 180 / np.pi
+            ellipses[f'{id_agent}'].center = (x, y)
+            ellipses[f'{id_agent}'].angle = angle
 
-        return (vehicles, labels, lines)
+        return (vehicles, labels, lines, ellipses)
 
     ani = FuncAnimation(fig=fig, func=update, frames=t_end-t_start, interval=50, repeat=False)
 

@@ -19,12 +19,11 @@ def general_TP_prompt():
             (4) If possible, when you are doing a replan, do not go back with the order of the waypoints, for example if in a previous plan you have gone to the exit, is better to not go back to the entry.
             (5) If you have to give priority to another agents, you have to give the instruction to wait this agents to pass, for example "brakes() and wait agents 0 to pass".
             (6) If an agent is leaving the cross, it should not be considered for the priorities.
-            (7) Try to wait that the distance from the other agents is bigger then 5 m before to enter a cross.
-            (8) If you want to instruct the car to move, you MUST always specify also the maximum speed.
-            (9) If you want to instruct the car to move DO NOT specify constraints on the agents, someone else will take car of that. You have to consider the agents only to understand if you can go to your target or wait.
-            (10) If you are coming to the cross and there is an other car, which is going to his exit, you MUST choose to move to your exit only if you will not interfere with his trajectory. 
-            (11) If a car is going to his exit before you, try to understand from previous descriptions if this car is going to his exit before you because it have priority over you. In this case you should wait that this car pass.
-            (12) If an agent is less then 3m away from you, you MUST brakes() and wait that this agent to pass as first task.
+            (7) If you want to instruct the car to move, you MUST always specify also the maximum speed.
+            (8) If you want to instruct the car to move DO NOT specify constraints on the agents, someone else will take car of that. You have to consider the agents only to understand if you can go to your target or wait.
+            (9) If you are coming to the cross and there is an other car, which is going to his exit, you MUST choose to move to your exit only if you will not interfere with his trajectory. 
+            (10) If a car is going to his exit before you, try to understand from previous descriptions if this car is going to his exit before you because it have priority over you. In this case you should wait that this car pass.
+            (11) If an agent is less then 3m away from you, you MUST brakes() and wait that this agent to pass as first task.
         
         The description of the situation will give you this list of information about the other agents:
             (1) The type of vehicle

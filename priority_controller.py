@@ -121,7 +121,6 @@ class PriorityController:
                             if dist_own_target >= 1:
                                 check_traffic = False
 
-
                     if check_traffic:
                         agents[id_priority_vehicle].target = agents[id_priority_vehicle].waypoints_exiting.pop(0)
                         agents[id_priority_vehicle].exiting = True

@@ -1,5 +1,6 @@
 numpy
 scipy
+shapely
 matplotlib
 casadi
 openai
