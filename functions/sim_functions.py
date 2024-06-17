@@ -1,4 +1,5 @@
 import numpy as np
+import time
 from shapely.geometry import Polygon
 import random
 import os
@@ -10,7 +11,7 @@ from priority_controller import PriorityController
 from vehicle import Vehicle
 from llm import LLM
 
-def sim_init():
+def sim_init(counter):
     SimulationParam = SimulationConfig()
     delta_t = SimulationParam['Timestep']
     env, circular_obstacles = EnviromentConfig(SimulationParam['Environment'])
@@ -42,7 +43,9 @@ def sim_init():
         info_vehicle = env['Vehicle Specification'][type]
         ego_vehicle = Vehicle(type, info_vehicle, delta_t)
         ego_vehicle.init_system_constraints(env["State space"], env['Ego Entrance']['speed limit'])
-        ego_vehicle.init_state_for_LLM(env, SimulationParam['Query'], SimulationParam['Controller']['Ego']['LLM']['Horizon'], SimulationParam['Controller']['Ego']['SF']['Horizon'])
+        ego_vehicle.init_state_for_LLM(env, SimulationParam)
+        if not ego_vehicle.use_LLM_output_in_SF:
+            ego_vehicle.update_velocity_limits(env)
     else:
         ego_vehicle = []
 
@@ -50,7 +53,10 @@ def sim_init():
 
     if SimulationParam['With LLM car']:
         Language_Module = LLM()
+        start = time.time()
         Language_Module.call_TP(env, SimulationParam['Query'], agents, ego_vehicle, 0)
+        end = time.time()
+        counter['elapsed time for LLM'].append(end-start)
 
         agents[str(len(agents))] = ego_vehicle
         results = results_init(env, agents)
@@ -74,9 +80,9 @@ def sim_init():
             pickle.dump(Language_Module, file)
 
     if env['With LLM car']:
-        return SimulationParam, env, agents, ego_vehicle, Language_Module, presence_emergency_car, order_optimization, priority, results, circular_obstacles
+        return SimulationParam, env, agents, ego_vehicle, Language_Module, presence_emergency_car, order_optimization, priority, results, circular_obstacles, counter
     else:
-        return SimulationParam, env, agents, ego_vehicle, [], presence_emergency_car, order_optimization, priority, results, circular_obstacles
+        return SimulationParam, env, agents, ego_vehicle, [], presence_emergency_car, order_optimization, priority, results, circular_obstacles, counter
 
 def sim_reload():
 
@@ -287,10 +293,10 @@ def check_proximity(ego, agent):
     too_near = False
 
     R_agent = np.zeros((2, 2))
-    R_agent[0, 0] = np.cos(agent.theta)
-    R_agent[0, 1] = -np.sin(agent.theta)
-    R_agent[1, 0] = np.sin(agent.theta)
-    R_agent[1, 1] = np.cos(agent.theta)
+    R_agent[0, 0] = np.cos(-agent.theta)
+    R_agent[0, 1] = -np.sin(-agent.theta)
+    R_agent[1, 0] = np.sin(-agent.theta)
+    R_agent[1, 1] = np.cos(-agent.theta)
 
     #V_agent = R_agent @ np.array([[1.5], [0]])
     #diff = R_agent @ (ego.position - (agent.position + V_agent))
@@ -339,6 +345,7 @@ def check_need_replan(ego_vehicle, agents, Language_Module, env, SimulationParam
     # check if the task is finished, i.e. when LLM car is near enough to a waypoint
     print('Cost LLM ', ego_vehicle.previous_opt_sol['Cost'])
     if 'entry' in Language_Module.TP['tasks'][Language_Module.task_status]:
+        ego_vehicle.target = ego_vehicle.entry['state']
         ego_vehicle.inside_cross = False
         if ego_vehicle.entering == False:
             ego_vehicle.entering = True
@@ -347,14 +354,17 @@ def check_need_replan(ego_vehicle, agents, Language_Module, env, SimulationParam
             next_task = True
     elif 'exit' in Language_Module.TP['tasks'][Language_Module.task_status]:
         ego_vehicle.inside_cross = True
+        ego_vehicle.target = ego_vehicle.exit['state']
         if ego_vehicle.exiting == False:
             ego_vehicle.entering = False
             ego_vehicle.exiting = True
-            ego_vehicle.target = ego_vehicle.waypoints_exiting.pop(0)
+            if len(ego_vehicle.waypoints_exiting) != 0:
+                ego_vehicle.target = ego_vehicle.waypoints_exiting.pop(0)
         if np.linalg.norm(ego_vehicle.position - ego_vehicle.exit['position']) <= 1:
             next_task = True
     elif 'final_target' in Language_Module.TP['tasks'][Language_Module.task_status]:
         ego_vehicle.inside_cross = False
+        ego_vehicle.target = ego_vehicle.final_target['state']
         if ego_vehicle.exiting == False:
             ego_vehicle.entering = False
             ego_vehicle.exiting = True
@@ -370,7 +380,10 @@ def check_need_replan(ego_vehicle, agents, Language_Module, env, SimulationParam
             Language_Module.task_status += 1
             reason = {'next_task': True, 'SF_kicks_in': False, 'other_agent_too_near': False,
                       'MPC_LLM_not_solved': False}
+            start = time.time()
             Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
+            end = time.time()
+            counter['elapsed time for LLM'].append(end - start)
             counter['TP calls'] += 1
         elif SimulationParam['Controller']['Ego']['SF']['Replan']['Active'] and ego_vehicle.previous_opt_sol_SF[
             'Cost'] >= SimulationParam['Controller']['Ego']['SF']['Replan']['toll']:
@@ -378,14 +391,20 @@ def check_need_replan(ego_vehicle, agents, Language_Module, env, SimulationParam
             ego_vehicle.t_subtask = 0
             reason = {'next_task': False, 'SF_kicks_in': True, 'other_agent_too_near': False,
                       'MPC_LLM_not_solved': False}
+            start = time.time()
             Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
+            end = time.time()
+            counter['elapsed time for LLM'].append(end - start)
             counter['TP calls'] += 1
         elif too_near:
             print('Call TP: because an agent is to near')
             ego_vehicle.t_subtask = 0
             reason = {'next_task': False, 'SF_kicks_in': False, 'other_agent_too_near': True,
                       'MPC_LLM_not_solved': False}
+            start = time.time()
             Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
+            end = time.time()
+            counter['elapsed time for LLM'].append(end - start)
             counter['TP calls'] += 1
         elif not ego_vehicle.success_solver_MPC_LLM:
             print(ego_vehicle.state)
@@ -393,16 +412,22 @@ def check_need_replan(ego_vehicle, agents, Language_Module, env, SimulationParam
             ego_vehicle.t_subtask = 0
             reason = {'next_task': False, 'SF_kicks_in': False, 'other_agent_too_near': False,
                       'MPC_LLM_not_solved': True}
+            start = time.time()
             Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
+            end = time.time()
+            counter['elapsed time for LLM'].append(end - start)
             counter['TP calls'] += 1
             ego_vehicle.success_solver_MPC_LLM = True
-        elif not ego_vehicle.success_solver_SF:
+        elif SimulationParam['Controller']['Ego']['SF']['Active'] and not ego_vehicle.success_solver_SF:
             print(ego_vehicle.state)
             print('Call TP: because no success of SF.')
             ego_vehicle.t_subtask = 0
             reason = {'next_task': False, 'SF_kicks_in': False, 'other_agent_too_near': False,
                       'MPC_LLM_not_solved': False, 'SF_not_solved': True}
+            start = time.time()
             Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
+            end = time.time()
+            counter['elapsed time for LLM'].append(end - start)
             counter['TP calls'] += 1
             ego_vehicle.success_solver_SF = True
 

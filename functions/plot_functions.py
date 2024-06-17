@@ -224,10 +224,10 @@ def prep_plot_vehicles(results, env, t_start, ax):
             shift = np.array([[np.cos(results[f'agent {id_agent}']['theta'][t_start]) * 1.5],
                               [np.sin(results[f'agent {id_agent}']['theta'][t_start]) * 1.5]])
 
-            #ellipses[f'{id_agent}'] = patches.Ellipse((results[f'agent {id_agent}']['x coord'][t_start],
-            #                           results[f'agent {id_agent}']['y coord'][t_start]), 8, 6, angle=angle,
-            #                           edgecolor='black', linestyle='--', linewidth=1, facecolor='none')
-            #ax.add_patch(ellipses[f'{id_agent}'])
+            ellipses[f'{id_agent}'] = patches.Ellipse((results[f'agent {id_agent}']['x coord'][t_start],
+                                       results[f'agent {id_agent}']['y coord'][t_start]), 8, 6, angle=angle,
+                                       edgecolor='black', linestyle='--', linewidth=1, facecolor='none')
+            ax.add_patch(ellipses[f'{id_agent}'])
 
     lines = {}
     # scats = {}
@@ -333,11 +333,11 @@ def plot_vehicles(results, fig, ax, env, t_start, t_end):
             #Security areas -> ellipsoid
             shift = np.array([[np.cos(results[f'agent {id_agent}']['theta'][t_start + frame]) * 1.5],
                               [np.sin(results[f'agent {id_agent}']['theta'][t_start + frame]) * 1.5]])
-            #x = results[f'agent {id_agent}']['x coord'][t_start + frame]
-            #y = results[f'agent {id_agent}']['y coord'][t_start + frame]
-            #angle = results[f'agent {id_agent}']['theta'][t_start + frame] * 180 / np.pi
-            #ellipses[f'{id_agent}'].center = (x, y)
-            #ellipses[f'{id_agent}'].angle = angle
+            x = results[f'agent {id_agent}']['x coord'][t_start + frame]
+            y = results[f'agent {id_agent}']['y coord'][t_start + frame]
+            angle = results[f'agent {id_agent}']['theta'][t_start + frame] * 180 / np.pi
+            ellipses[f'{id_agent}'].center = (x, y)
+            ellipses[f'{id_agent}'].angle = angle
 
         return (vehicles, labels, lines, ellipses)
 

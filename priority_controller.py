@@ -43,7 +43,8 @@ class PriorityController:
             dist_own_target = np.linalg.norm(
                 agents[id_agent].position - agents[id_agent].target[0:2])
             if dist_own_target <= 1:
-                agents[id_agent].target = agents[id_agent].waypoints_exiting.pop(0)
+                if len(agents[id_agent].waypoints_exiting) != 0:
+                    agents[id_agent].target = agents[id_agent].waypoints_exiting.pop(0)
                 agents[id_agent].exiting = True
                 agents[id_agent].entering = False
                 if ego:

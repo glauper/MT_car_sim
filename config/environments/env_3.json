@@ -59,7 +59,7 @@
 			"width": 2,
 			"l_f": 1,
 			"l_r": 1,
-			"security distance": 3,
+			"security distance": 4,
 			"a security dist": 4,
 			"b security dist": 3,
 			"velocity limits": [-1, 33],

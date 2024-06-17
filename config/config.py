@@ -8,7 +8,7 @@ def SimulationConfig():
                        'With LLM car': True,
                        'Timestep': 0.2, # [s]
                        'Environment': 0,
-                       'Query': 'go to the exit on the left',
+                       'Query': 'go to the exit on the left', #'go straight to the exit in front of you', 'go to the exit on the right'
                        'Controller': {
                            'Agents': {
                                'Type': "tracking MPC",
@@ -21,10 +21,13 @@ def SimulationConfig():
                                    'Replan': {
                                        'Active': False,
                                        'toll': 10
-                                   }
+                                   },
+                                   'Use LLM output': False
                                },
                                'LLM': {
-                                   'Horizon': 20
+                                   'Horizon': 20,
+                                   'Soft': True,
+                                   'Terminal set': False
                                }
                            }
                        }

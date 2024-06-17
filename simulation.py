@@ -3,25 +3,26 @@ import time
 import re
 import json
 import os
-from functions.plot_functions import plot_simulation, input_animation
+from functions.plot_functions import plot_simulation, input_animation, save_all_frames
 from functions.sim_functions import (results_update_and_save, sim_init, sim_reload, check_proximity, check_crash,
                                           check_need_replan)
 
+counter = {'crash': 0,
+           'TP calls': 1,
+           'OD calls':0,
+           'elapsed time for LLM': [],
+           'too_near': 0,
+           'fail solver MPC LLM': 0,
+           'fail solver SF': 0}
+
 (SimulationParam, env, agents, ego_vehicle, Language_Module, presence_emergency_car, order_optimization, priority,
- results, circular_obstacles) = sim_init()
+ results, circular_obstacles, counter) = sim_init(counter)
 #(SimulationParam, env, agents, ego_vehicle, Language_Module, presence_emergency_car, order_optimization, priority,
 # results, circular_obstacles) = sim_reload()
 
 t = 0
 run_simulation = True
 ego_brake = False
-counter = {'crash': 0,
-           'TP calls': 1,
-           'OD calls':0,
-           'too_near': 0,
-           'fail solver MPC LLM': 0,
-           'fail solver SF': 0}
-
 while run_simulation:
     print("Simulation time: ", t)
     if SimulationParam['With LLM car']:
@@ -53,8 +54,6 @@ while run_simulation:
                         too_near = False
                     else:
                         too_near = True
-                if check_crash(ego_vehicle, agents[name_vehicle]):
-                    counter['crash'] += 1
 
     # Here all the steps for the LLM car
     if SimulationParam['With LLM car']:
@@ -105,21 +104,37 @@ while run_simulation:
             # Check if necessary to have new Optimization Design
             if len(Language_Module.OD) == 0:
                 print('Call OD the first time, for :', Language_Module.TP['tasks'][Language_Module.task_status])
+                start = time.time()
                 Language_Module.call_OD(SimulationParam['Environment'], agents, t)
+                end = time.time()
+                counter['elapsed time for LLM'].append(end-start)
                 counter['OD calls'] += 1
             elif ego_vehicle.t_subtask == 0:
                 print('Call OD for :', Language_Module.TP['tasks'][Language_Module.task_status])
+                start = time.time()
                 Language_Module.recall_OD(SimulationParam['Environment'], agents, t)
+                end = time.time()
+                counter['elapsed time for LLM'].append(end-start)
                 counter['OD calls'] += 1
             # Here MPC with LLM output
-            input_ego = ego_vehicle.MPC_LLM(agents, circular_obstacles, t, Language_Module)
+            if not SimulationParam['Controller']['Ego']['LLM']['Soft']:
+                input_ego = ego_vehicle.MPC_LLM(agents, circular_obstacles, t, Language_Module)
+            else:
+                input_ego = ego_vehicle.soft_MPC_LLM(agents, circular_obstacles, t, Language_Module)
             if not ego_vehicle.success_solver_MPC_LLM:
                 Language_Module.final_messages.append({'Vehicle': 'No success for MPC LLM solver',
                                                        'time': t})
                 counter['fail solver MPC LLM'] += 1
+
             # Here SF
             if SimulationParam['Controller']['Ego']['SF']['Active']:
-                input_ego = ego_vehicle.SF(input_ego, agents, circular_obstacles, t, Language_Module)
+                if ego_vehicle.entering:
+                    info = {'street speed limit': ego_vehicle.entry['max vel']}
+                elif ego_vehicle.exiting and ego_vehicle.inside_cross:
+                    info = {'street speed limit': ego_vehicle.exit['max vel']}
+                else:
+                    info = {'street speed limit': ego_vehicle.final_target['max vel']}
+                input_ego = ego_vehicle.SF(input_ego, agents, circular_obstacles, t, Language_Module, info)
                 print('Cost SF ', ego_vehicle.previous_opt_sol_SF['Cost'])
                 if not ego_vehicle.success_solver_SF:
                     Language_Module.final_messages.append({'Vehicle': 'No success for SF solver',
@@ -162,9 +177,12 @@ while run_simulation:
     else:
         agents = priority.SwissPriority(agents, order_optimization, SimulationParam['With LLM car'])
 
-    # update the velocity limit in the new street for other agents
+    # update the velocity limit in the new street for other agents and check i there are crush
     for name_agent in agents:
-        agents[name_agent].update_velocity_limits(env)
+        if agents[name_agent].entering or agents[name_agent].exiting:
+            agents[name_agent].update_velocity_limits(env)
+            if check_crash(ego_vehicle, agents[name_agent]):
+                counter['crash'] += 1
 
     # Check if some flag say that a replan of TP is needed for LLM car
     if SimulationParam['With LLM car']:
@@ -241,8 +259,14 @@ while run_simulation:
         if all(reach_end_target):
             run_simulation = False
 
-    if t == 400:
+    if t == 300:
         print('End simulation: because max simulation steps are reached.')
+        run_simulation = False
+    elif counter['TP calls'] >= 15:
+        print('End simulation: because LLM is called to many times.')
+        run_simulation = False
+    elif counter['crash'] >= 1:
+        print('End simulation: because LLM car crushes to another agent.')
         run_simulation = False
 
 # Save the results
@@ -258,6 +282,9 @@ print('How many times TP is called: ', counter['TP calls'])
 print('How many times OD is called: ', counter['OD calls'])
 print('How many times solver MPC LLM failed: ', counter['fail solver MPC LLM'])
 print('How many times solver SF failed: ', counter['fail solver SF'])
+counter['Mean time for LLM'] = np.mean(counter['elapsed time for LLM'])
+print('Mean elapsed time for LLM to give output: ', counter['Mean time for LLM'])
+
 path = os.path.join(os.path.dirname(__file__), ".", "save_results/counter.json")
 with open(path, 'w') as file:
     json.dump(counter, file)
@@ -266,3 +293,4 @@ results = results_update_and_save(env, agents, results, ego_brake)
 
 plot_simulation(SimulationParam['Environment'], env, results, t_start=0, t_end=len(results['agent 0']['x coord']))
 input_animation(results, t_start=0, t_end=len(results['agent 0']['x coord']))
+save_all_frames(results, env)
