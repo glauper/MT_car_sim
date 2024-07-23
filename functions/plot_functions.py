@@ -248,59 +248,6 @@ def prep_plot_vehicles(results, env, t_start, ax):
     return vehicles, labels, lines, ellipses, ax
 
 def plot_vehicles(results, fig, ax, env, t_start, t_end):
-    """vehicles = {}
-    labels = {}
-    for id_agent in range(len(results)):
-        if results[f'agent {id_agent}']['type'] in env['Vehicle Specification']['types']:
-            L = env['Vehicle Specification'][results[f'agent {id_agent}']['type']]['length']
-            W = env['Vehicle Specification'][results[f'agent {id_agent}']['type']]['width']
-            angle = results[f'agent {id_agent}']['theta'][t_start] * 180 / np.pi
-            if results[f'agent {id_agent}']['type'] == 'standard car':
-                color = 'green'
-            elif results[f'agent {id_agent}']['type'] == 'emergency car':
-                color = 'red'
-            if id_agent != len(results) - 1:
-                vehicles[f'{id_agent}'] = patches.Rectangle(
-                    (results[f'agent {id_agent}']['x coord'][t_start] - L / 2, results[f'agent {id_agent}']['y coord'][t_start] - W / 2),
-                    L, W, angle=angle, rotation_point='center', facecolor=color, label=str(id_agent))
-                labels[f'{id_agent}'] = ax.text(results[f'agent {id_agent}']['x coord'][t_start],
-                                                results[f'agent {id_agent}']['y coord'][t_start], f'{id_agent}',
-                                                ha='center', va='center', color='white')
-            else:
-                if env['With LLM car']:
-                    vehicles[f'{id_agent}'] = patches.Rectangle(
-                        (results[f'agent {id_agent}']['x coord'][t_start] - L / 2, results[f'agent {id_agent}']['y coord'][t_start] - W / 2),
-                        L, W, angle=angle, rotation_point='center', facecolor='blue', label='LLM car')
-                    labels[f'{id_agent}'] = ax.text(results[f'agent {id_agent}']['x coord'][t_start],
-                                                    results[f'agent {id_agent}']['y coord'][t_start], 'LLM',
-                                                    ha='center', va='center', color='black')
-                else:
-                    vehicles[f'{id_agent}'] = patches.Rectangle(
-                        (results[f'agent {id_agent}']['x coord'][t_start] - L / 2, results[f'agent {id_agent}']['y coord'][t_start] - W / 2),
-                        L, W, angle=angle, rotation_point='center', facecolor=color, label=str(id_agent))
-                    labels[f'{id_agent}'] = ax.text(results[f'agent {id_agent}']['x coord'][t_start],
-                                                    results[f'agent {id_agent}']['y coord'][t_start], f'{id_agent}',
-                                                    ha='center', va='center', color='white')
-            ax.add_patch(vehicles[f'{id_agent}'])
-
-    lines = {}
-    # scats = {}
-    for k in range(len(results)):
-        if env['With LLM car'] and k == len(results) - 1:
-            lines[f'line{k} SF'] = \
-            ax.plot(results[f'agent {k}']['x coord pred SF'][t_start], results[f'agent {k}']['y coord pred SF'][t_start],
-                    c="orange", linestyle='--')[0]  # label=f'v0 = {v02} m/s'
-        else:
-            lines[f'line{k} traj estimation'] = \
-                ax.plot(results[f'agent {k}']['trajectory estimation x'][t_start],
-                        results[f'agent {k}']['trajectory estimation y'][t_start], c="green",
-                        linestyle='--')[0]  # label=f'v0 = {v02} m/s'
-        lines[f'line{k}'] = \
-            ax.plot(results[f'agent {k}']['x coord pred'][t_start], results[f'agent {k}']['y coord pred'][t_start], c="red",
-                    linestyle='--')[0]  # label=f'v0 = {v02} m/s'
-
-        # scats[f'line{k}'] = ax.scatter(results[f'agent {k}']['x coord'][0], results[f'agent {k}']['y coord'][0], c="r", s=5, label=f'car_{k + 1}')
-    """
 
     vehicles, labels, lines, ellipses, ax = prep_plot_vehicles(results, env, t_start, ax)
     def update(frame):
@@ -397,8 +344,8 @@ def plot_simulation_env_0(env, results, t_start, t_end, fig, ax):
     ax.plot([0, 0], [-25, -6], color='black', linestyle='--')
     ax.plot([0, 0], [25, 6], color='black', linestyle='--')
 
-    for id in env['Entrances']:
-        ax.scatter(env['Entrances'][id]['position'][0], env['Entrances'][id]['position'][1], color='magenta')
+    #for id in env['Entrances']:
+    #    ax.scatter(env['Entrances'][id]['position'][0], env['Entrances'][id]['position'][1], color='magenta')
     for id in env['Exits']:
         ax.scatter(env['Exits'][id]['position'][0], env['Exits'][id]['position'][1], color='blue')
 
@@ -621,3 +568,81 @@ def plot_simulation_env_5(env, results, t_start, t_end, fig, ax):
     #plt.show()
 
     return ani, ax, fig
+
+def plot_frame_for_describer(env_type, env, agents, ego, t):
+    fig, ax = plt.subplots()
+
+    if env_type == 0:
+        ani, ax, fig = plot_simulation_env_0(env, None, None, None, fig, ax)
+    elif env_type == 1:
+        ani, ax, fig = plot_simulation_env_1(env, None, None, None, fig, ax)
+    elif env_type == 2:
+        ani, ax, fig = plot_simulation_env_2(env, None, None, None, fig, ax)
+    elif env_type == 3:
+        ani, ax, fig = plot_simulation_env_3(env, None, None, None, fig, ax)
+    elif env_type == 4:
+        ani, ax, fig = plot_simulation_env_4(env, None, None, None, fig, ax)
+    elif env_type == 5:
+        ani, ax, fig = plot_simulation_env_5(env, None, None, None, fig, ax)
+    else:
+        print('Not ready')
+
+    for name_agent in agents:
+        if agents[name_agent].type in env['Vehicle Specification']['types']:
+            if np.linalg.norm(agents[name_agent].position - ego.final_target['position']) > 1:
+                L = agents[name_agent].length
+                W = agents[name_agent].width
+                angle = agents[name_agent].theta * 180 / np.pi
+                if agents[name_agent].type == 'standard car':
+                    color = 'green'
+                elif agents[name_agent].type == 'emergency car':
+                    color = 'red'
+                rectangle = patches.Rectangle((agents[name_agent].x - L / 2, agents[name_agent].y - W / 2), L, W,
+                                              angle=angle, rotation_point='center', facecolor=color, label=str(name_agent))
+                ax.text(agents[name_agent].x, agents[name_agent].y, f'{name_agent}', ha='center', va='center', color='white')
+                ax.add_patch(rectangle)
+
+                shift = np.array([[np.cos(agents[name_agent].theta) * 1.5],
+                                  [np.sin(agents[name_agent].theta) * 1.5]])
+
+                ellipse = patches.Ellipse((agents[name_agent].x, agents[name_agent].y),
+                                          agents[name_agent].a_security_dist * 2, agents[name_agent].b_security_dist * 2,
+                                          angle=angle, edgecolor='black', linestyle='--', linewidth=1, facecolor='none')
+                ax.add_patch(ellipse)
+
+                agents[name_agent].trajecotry_estimation()
+                ax.plot(agents[name_agent].traj_estimation[0, :], agents[name_agent].traj_estimation[1, :], c="green", linestyle='-')
+
+    if env['With LLM car']:
+        angle = ego.theta * 180 / np.pi
+        rectangle = patches.Rectangle((ego.x - L / 2, ego.y - W / 2), L, W, angle=angle, rotation_point='center',
+                                      facecolor='blue', label='LLM car')
+        ax.text(ego.x, ego.y, 'LLM', ha='center', va='center', color='black')
+
+        ax.add_patch(rectangle)
+
+        shift = np.array([[np.cos(ego.theta) * 1.5],
+                          [np.sin(ego.theta) * 1.5]])
+
+        ellipse = patches.Ellipse((ego.x, ego.y),agents[name_agent].a_security_dist * 2, agents[name_agent].b_security_dist * 2,
+                                  angle=angle, edgecolor='black', linestyle='--', linewidth=1, facecolor='none')
+        ax.add_patch(ellipse)
+
+        ego.trajecotry_estimation()
+        ax.plot(ego.traj_estimation[0, :], ego.traj_estimation[1, :], c="green", linestyle='-')
+
+    ax.set_xlim(env["State space"]["x limits"][0], env["State space"]["x limits"][1])
+    ax.set_ylim(env["State space"]["y limits"][0], env["State space"]["y limits"][1])
+
+    plt.scatter(ego.entry['x'],  ego.entry['y'], color='blue')
+    plt.text(ego.entry['x'] - 2 ,  ego.entry['y'] + 1.1, 'entry', fontsize=10, color='blue')
+    plt.scatter(ego.exit['x'], ego.exit['y'], color='blue')
+    plt.text(ego.exit['x'] - 2, ego.exit['y'] + 1.1, 'exit', fontsize=10, color='blue')
+    plt.scatter(ego.final_target['x'], ego.final_target['y'], color='blue')
+    plt.text(ego.final_target['x'] - 5.1, ego.final_target['y']+ 1.1, 'final_target', fontsize=10, color='blue')
+
+    path_fig = os.path.join(os.path.dirname(__file__), "..", f"prompts/output_LLM/frames/")
+    fig.savefig(path_fig + f'frame_{t}.png')
+    plt.close(fig)
+
+    return fig

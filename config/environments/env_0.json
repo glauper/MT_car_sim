@@ -77,7 +77,7 @@
 	},
 	"Entrances": {
 		"0": {
-			"position": [-18, -3],
+			"position": [-16, -3],
 			"orientation": 0,
 			"speed limit": 2,
 			"offset": [5, 0],
@@ -85,6 +85,38 @@
 			"waypoints": [[-7, -3]]
 		},
 		"1": {
+			"position": [-12, -3],
+			"orientation": 0,
+			"speed limit": 2,
+			"offset": [5, 0],
+			"targets": [1, 2, 3],
+			"waypoints": [[-7, -3]]
+		},
+		"2": {
+			"position": [-9, -3],
+			"orientation": 0,
+			"speed limit": 2,
+			"offset": [5, 0],
+			"targets": [1, 2, 3],
+			"waypoints": [[-7, -3]]
+		},
+		"3": {
+			"position": [-24, -3],
+			"orientation": 0,
+			"speed limit": 2,
+			"offset": [5, 0],
+			"targets": [1, 2, 3],
+			"waypoints": [[-7, -3]]
+		},
+		"4": {
+			"position": [-20, -3],
+			"orientation": 0,
+			"speed limit": 2,
+			"offset": [5, 0],
+			"targets": [1, 2, 3],
+			"waypoints": [[-7, -3]]
+		},
+		"5": {
 			"position": [12, 3],
 			"orientation": 180,
 			"speed limit": 2,
@@ -92,8 +124,72 @@
 			"targets": [1, 0, 3],
 			"waypoints": [[7, 3]]
 		},
-		"2": {
-			"position": [-3, 23],
+		"6": {
+			"position": [20, 3],
+			"orientation": 180,
+			"speed limit": 2,
+			"offset": [-5, 0],
+			"targets": [1, 0, 3],
+			"waypoints": [[7, 3]]
+		},
+		"7": {
+			"position": [16, 3],
+			"orientation": 180,
+			"speed limit": 2,
+			"offset": [-5, 0],
+			"targets": [1, 0, 3],
+			"waypoints": [[7, 3]]
+		},
+		"8": {
+			"position": [9, 3],
+			"orientation": 180,
+			"speed limit": 2,
+			"offset": [-5, 0],
+			"targets": [1, 0, 3],
+			"waypoints": [[7, 3]]
+		},
+		"9": {
+			"position": [24, 3],
+			"orientation": 180,
+			"speed limit": 2,
+			"offset": [-5, 0],
+			"targets": [1, 0, 3],
+			"waypoints": [[7, 3]]
+		},
+		"10": {
+			"position": [-3, 24],
+			"orientation": -90,
+			"speed limit": 2,
+			"offset": [0, -5],
+			"targets": [1, 2, 0],
+			"waypoints": [[-3, 7]]
+		},
+		"11": {
+			"position": [-3, 9],
+			"orientation": -90,
+			"speed limit": 2,
+			"offset": [0, -5],
+			"targets": [1, 2, 0],
+			"waypoints": [[-3, 7]]
+		},
+		"12": {
+			"position": [-3, 16],
+			"orientation": -90,
+			"speed limit": 2,
+			"offset": [0, -5],
+			"targets": [1, 2, 0],
+			"waypoints": [[-3, 7]]
+		},
+		"13": {
+			"position": [-3, 20],
+			"orientation": -90,
+			"speed limit": 2,
+			"offset": [0, -5],
+			"targets": [1, 2, 0],
+			"waypoints": [[-3, 7]]
+		},
+		"14": {
+			"position": [-3, 12],
 			"orientation": -90,
 			"speed limit": 2,
 			"offset": [0, -5],

@@ -11,7 +11,7 @@ from priority_controller import PriorityController
 from vehicle import Vehicle
 from llm import LLM
 
-def sim_init(counter):
+def sim_init(counter, type_simulation):
     SimulationParam = SimulationConfig()
     delta_t = SimulationParam['Timestep']
     env, circular_obstacles = EnviromentConfig(SimulationParam['Environment'])
@@ -52,11 +52,24 @@ def sim_init(counter):
     priority = PriorityController(SimulationParam['Controller']['Agents']['Type'], SimulationParam['Environment'], env)
 
     if SimulationParam['With LLM car']:
-        Language_Module = LLM()
-        start = time.time()
-        Language_Module.call_TP(env, SimulationParam['Query'], agents, ego_vehicle, 0)
-        end = time.time()
-        counter['elapsed time for LLM'].append(end-start)
+        if type_simulation == "safe_narrate":
+            Language_Module = LLM(SimulationParam['Describer active'])
+            start = time.time()
+            Language_Module.call_TP(env, SimulationParam['Query'], agents, ego_vehicle, 0)
+            end = time.time()
+            counter['elapsed time for LLM'].append(end-start)
+        elif type_simulation == "llm_conditioned_mpc":
+            llm_cond_mpc = LLM(SimulationParam['Describer active'])
+            start = time.time()
+            llm_cond_mpc.call_LLM(env, SimulationParam['Query'], agents, ego_vehicle, 0)
+            end = time.time()
+            counter['elapsed time for LLM'].append(end - start)
+        elif type_simulation == "llm_based_safe_control":
+            llm_based_mpc = LLM(SimulationParam['Describer active'])
+            start = time.time()
+            llm_based_mpc.call_LLM_coder(env, SimulationParam['Query'], agents, ego_vehicle, 0)
+            end = time.time()
+            counter['elapsed time for LLM'].append(end - start)
 
         agents[str(len(agents))] = ego_vehicle
         results = results_init(env, agents)
@@ -66,21 +79,27 @@ def sim_init(counter):
         results = results_init(env, agents)
         options_entrance = list(env['Entrances'].keys())
 
-    path = os.path.join(os.path.dirname(__file__), "..")
-    print(path)
-    # Save some info to eventually reload the simulation
-    with open(path + '/reload_sim/SimulationParam.pkl', 'wb') as file:
-        pickle.dump(SimulationParam, file)
-    with open(path + '/reload_sim/agents.pkl', 'wb') as file:
-        pickle.dump(agents, file)
-    with open(path + '/reload_sim/ego_vehicle.pkl', 'wb') as file:
-        pickle.dump(ego_vehicle, file)
-    if SimulationParam['With LLM car']:
-        with open(path + '/reload_sim/Language_Module.pkl', 'wb') as file:
-            pickle.dump(Language_Module, file)
+    if type_simulation == "safe_narrate":
+        path = os.path.join(os.path.dirname(__file__), "..")
+        # Save some info to eventually reload the simulation
+        with open(path + '/reload_sim/SimulationParam.pkl', 'wb') as file:
+            pickle.dump(SimulationParam, file)
+        with open(path + '/reload_sim/agents.pkl', 'wb') as file:
+            pickle.dump(agents, file)
+        with open(path + '/reload_sim/ego_vehicle.pkl', 'wb') as file:
+            pickle.dump(ego_vehicle, file)
+        if SimulationParam['With LLM car']:
+            with open(path + '/reload_sim/Language_Module.pkl', 'wb') as file:
+                pickle.dump(Language_Module, file)
 
     if env['With LLM car']:
-        return SimulationParam, env, agents, ego_vehicle, Language_Module, presence_emergency_car, order_optimization, priority, results, circular_obstacles, counter
+        if type_simulation == "safe_narrate":
+            return SimulationParam, env, agents, ego_vehicle, Language_Module, presence_emergency_car, order_optimization, priority, results, circular_obstacles, counter
+        elif type_simulation == "llm_conditioned_mpc":
+            return SimulationParam, env, agents, ego_vehicle, llm_cond_mpc, presence_emergency_car, order_optimization, priority, results, circular_obstacles, counter
+        elif type_simulation == "llm_based_safe_control":
+            return SimulationParam, env, agents, ego_vehicle, llm_based_mpc, presence_emergency_car, order_optimization, priority, results, circular_obstacles, counter
+
     else:
         return SimulationParam, env, agents, ego_vehicle, [], presence_emergency_car, order_optimization, priority, results, circular_obstacles, counter
 
@@ -374,12 +393,19 @@ def check_need_replan(ego_vehicle, agents, Language_Module, env, SimulationParam
             run_simulation = False
 
     if run_simulation:
+        reason = {'next_task': False,
+                  'SF_kicks_in': False,
+                  'other_agent_too_near': False,
+                  'MPC_LLM_not_solved': False,
+                  'SF_not_solved': False,
+                  'soft_SF_kicks_in': False,
+                  'soft_SF_psi_not_solved': False,
+                  'soft_SF_not_solved': False}
         if next_task:
             print('Call TP: because a task is terminated and a new one begins.')
             ego_vehicle.t_subtask = 0
             Language_Module.task_status += 1
-            reason = {'next_task': True, 'SF_kicks_in': False, 'other_agent_too_near': False,
-                      'MPC_LLM_not_solved': False}
+            reason['next_task'] = True
             start = time.time()
             Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
             end = time.time()
@@ -389,8 +415,7 @@ def check_need_replan(ego_vehicle, agents, Language_Module, env, SimulationParam
             'Cost'] >= SimulationParam['Controller']['Ego']['SF']['Replan']['toll']:
             print('Call TP: because SF cost are high')
             ego_vehicle.t_subtask = 0
-            reason = {'next_task': False, 'SF_kicks_in': True, 'other_agent_too_near': False,
-                      'MPC_LLM_not_solved': False}
+            reason['SF_kicks_in'] = True
             start = time.time()
             Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
             end = time.time()
@@ -399,19 +424,16 @@ def check_need_replan(ego_vehicle, agents, Language_Module, env, SimulationParam
         elif too_near:
             print('Call TP: because an agent is to near')
             ego_vehicle.t_subtask = 0
-            reason = {'next_task': False, 'SF_kicks_in': False, 'other_agent_too_near': True,
-                      'MPC_LLM_not_solved': False}
+            reason['other_agent_too_near'] = True
             start = time.time()
             Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
             end = time.time()
             counter['elapsed time for LLM'].append(end - start)
             counter['TP calls'] += 1
         elif not ego_vehicle.success_solver_MPC_LLM:
-            print(ego_vehicle.state)
             print('Call TP: because no success of MPC LLM.')
             ego_vehicle.t_subtask = 0
-            reason = {'next_task': False, 'SF_kicks_in': False, 'other_agent_too_near': False,
-                      'MPC_LLM_not_solved': True}
+            reason['MPC_LLM_not_solved'] = True
             start = time.time()
             Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
             end = time.time()
@@ -419,16 +441,47 @@ def check_need_replan(ego_vehicle, agents, Language_Module, env, SimulationParam
             counter['TP calls'] += 1
             ego_vehicle.success_solver_MPC_LLM = True
         elif SimulationParam['Controller']['Ego']['SF']['Active'] and not ego_vehicle.success_solver_SF:
-            print(ego_vehicle.state)
             print('Call TP: because no success of SF.')
             ego_vehicle.t_subtask = 0
-            reason = {'next_task': False, 'SF_kicks_in': False, 'other_agent_too_near': False,
-                      'MPC_LLM_not_solved': False, 'SF_not_solved': True}
+            reason['SF_not_solved'] = True
             start = time.time()
             Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
             end = time.time()
             counter['elapsed time for LLM'].append(end - start)
             counter['TP calls'] += 1
+            ego_vehicle.success_solver_SF = True
+        elif ego_vehicle.SF_soft_active and ego_vehicle.previous_opt_sol_soft_SF_psi['Cost'] > 0:
+            print('Call TP: because the cost of soft SF psi are higher then zero.')
+            ego_vehicle.t_subtask = 0
+            reason['soft_SF_kicks_in'] = True
+            start = time.time()
+            Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
+            end = time.time()
+            counter['elapsed time for LLM'].append(end - start)
+            counter['TP calls'] += 1
+            ego_vehicle.success_solver_SF_psi = True
+            ego_vehicle.success_solver_SF = True
+        elif ego_vehicle.SF_soft_active and not ego_vehicle.success_solver_SF_psi:
+            print('Call TP: because no success for solver soft SF psi.')
+            ego_vehicle.t_subtask = 0
+            reason['soft_SF_psi_not_solved'] = True
+            start = time.time()
+            Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
+            end = time.time()
+            counter['elapsed time for LLM'].append(end - start)
+            counter['TP calls'] += 1
+            ego_vehicle.success_solver_SF_psi = True
+            ego_vehicle.success_solver_SF = True
+        elif ego_vehicle.SF_soft_active and not ego_vehicle.success_solver_SF:
+            print('Call TP: because no success for solver soft SF.')
+            ego_vehicle.t_subtask = 0
+            reason['soft_SF_not_solved'] = True
+            start = time.time()
+            Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
+            end = time.time()
+            counter['elapsed time for LLM'].append(end - start)
+            counter['TP calls'] += 1
+            ego_vehicle.success_solver_SF_psi = True
             ego_vehicle.success_solver_SF = True
 
     return run_simulation, counter

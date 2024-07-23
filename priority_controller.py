@@ -45,6 +45,7 @@ class PriorityController:
             if dist_own_target <= 1:
                 if len(agents[id_agent].waypoints_exiting) != 0:
                     agents[id_agent].target = agents[id_agent].waypoints_exiting.pop(0)
+                #agents[id_agent].target = agents[id_agent].waypoints_exiting.pop(0)
                 agents[id_agent].exiting = True
                 agents[id_agent].entering = False
                 if ego:

@@ -75,6 +75,7 @@ class Vehicle:
         self.terminal_set = sim_params['Controller']['Ego']['LLM']['Terminal set']
         self.use_LLM_output_in_SF = sim_params['Controller']['Ego']['SF']['Use LLM output']
         self.SF_active = sim_params['Controller']['Ego']['SF']['Active']
+        self.SF_soft_active = sim_params['Controller']['Ego']['SF']['Soft']
         self.N = sim_params['Controller']['Ego']['LLM']['Horizon']
         self.N_SF = sim_params['Controller']['Ego']['SF']['Horizon']
 
@@ -496,7 +497,7 @@ class Vehicle:
         cost = 0
         for k in range(self.N):
             # LLM cost and constraints
-            cost, opti = self.OD_output(opti, cost, llm, X[:,k], U[:,k], agents)
+            cost, opti = self.OD_output(opti, cost, llm, X[:,k], U[:,k], agents, t)
 
             # State and Input constraints
             opti.subject_to(self.A_x @ X[:, k + 1] <= self.b_x)
@@ -505,7 +506,7 @@ class Vehicle:
             # System dynamics constraints
             opti.subject_to(self.dynamics_constraints(X[:, k + 1], X[:, k], U[:, k]))
 
-        cost, opti = self.OD_output(opti, cost, llm, X[:,-1], U[:,-1], agents) # U[-1] and X[-1] do not corresponds!
+        cost, opti = self.OD_output(opti, cost, llm, X[:,-1], U[:,-1], agents, t) # U[-1] and X[-1] do not corresponds!
 
         # Constraint for the steady state
         if self.terminal_set:
@@ -554,7 +555,7 @@ class Vehicle:
             input = sol.value(U)[:, 0].reshape((self.m, 1))
             self.success_solver_MPC_LLM = True
         else:
-
+            self.previous_opt_sol['Cost'] = 10
             if not self.SF_active:
                 # Brake
                 input = np.zeros((self.m, 1))
@@ -572,7 +573,7 @@ class Vehicle:
 
         return input
 
-    def OD_output(self, opti, obj, llm, X, U, agents):
+    def OD_output(self, opti, obj, llm, X, U, agents, t):
 
         x = X[0]
         y = X[1]
@@ -614,17 +615,17 @@ class Vehicle:
         for k in range(self.N):
             # LLM cost and constraints
             if nr_ineq_const + nr_eq_const >= 1:
-                cost, opti = self.soft_OD_output(opti, cost, llm, X[:,k], U[:,k], agents, epsilon_LLM_constraints[:, k])
+                cost, opti = self.soft_OD_output(opti, cost, llm, X[:,k], U[:,k], agents, epsilon_LLM_constraints[:, k], t)
             else:
-                cost, opti = self.OD_output(opti, cost, llm, X[:, k], U[:, k], agents)
+                cost, opti = self.OD_output(opti, cost, llm, X[:, k], U[:, k], agents, t)
             # System dynamics constraints
             opti.subject_to(self.dynamics_constraints(X[:, k + 1], X[:, k], U[:, k]))
 
         # cost, opti = self.OD_output(opti, cost, llm, X[:, -1], U[:, -1], agents)
         if nr_ineq_const + nr_eq_const >= 1:
-            cost, opti = self.soft_OD_output(opti, cost, llm, X[:, -1], U[:, -1], agents, epsilon_LLM_constraints[:, -1])
+            cost, opti = self.soft_OD_output(opti, cost, llm, X[:, -1], U[:, -1], agents, epsilon_LLM_constraints[:, -1], t)
         else:
-            cost, opti = self.OD_output(opti, cost, llm, X[:, -1], U[:, -1], agents)
+            cost, opti = self.OD_output(opti, cost, llm, X[:, -1], U[:, -1], agents, t)
 
         # Initial state
         opti.subject_to(X[:, 0] == self.state)
@@ -661,7 +662,7 @@ class Vehicle:
 
         return input
 
-    def soft_OD_output(self, opti, obj, llm, X, U, agents, epsilon):
+    def soft_OD_output(self, opti, obj, llm, X, U, agents, epsilon, t):
 
         x = X[0]
         y = X[1]
@@ -681,11 +682,13 @@ class Vehicle:
         obj += eval(cost)
         count = 0
         for i in range(nr_ineq_const):
-            opti.subject_to(eval(ineq_constraints[i]) + epsilon[count] <= 0)
+            const = ineq_constraints[i] + """+ epsilon[count]"""
+            opti.subject_to(eval(const) <= 0)
             obj += epsilon[count] ** 2
             count += 1
         for i in range(nr_eq_const):
-            opti.subject_to(eval(eq_constraints[i]) + epsilon[count] == 0)
+            const = eq_constraints[i] + """+ epsilon[count]"""
+            opti.subject_to(eval(const)== 0)
             obj += epsilon[count] ** 2
             count += 1
 
@@ -797,6 +800,223 @@ class Vehicle:
 
         return input
 
+    def soft_SF_psi(self, agents, circular_obstacles, t, info):
+
+        opti = ca.Opti()
+
+        nr_constraints = np.size(self.b_x)
+        b_x_ind = np.arange(0, np.size(self.b_x))
+        nr_constraints += np.size(self.b_u)
+        b_u_ind = np.arange(np.size(self.b_x), np.size(self.b_x)+np.size(self.b_u))
+        nr_constraints += 1
+        v_limit_ind = np.size(self.b_x) + np.size(self.b_u)
+        nr_constraints += 1 * len(agents)
+        first_agent_ind = v_limit_ind + 1
+        nr_constraints += 1 * len(circular_obstacles)
+        first_obst_ind = first_agent_ind + len(agents)
+
+        X = opti.variable(self.n, self.N_SF + 1)
+        U = opti.variable(self.m, self.N_SF)
+        x_s = opti.variable(self.n, 1)
+        u_s = opti.variable(self.m, 1)
+
+        psi = opti.variable(nr_constraints, self.N_SF + 1)
+
+        cost = 0
+        for k in range(self.N_SF + 1):
+            cost += ca.norm_2(psi[:, k]) ** 2
+
+        for k in range(self.N_SF):
+            # State and Input constraints
+            opti.subject_to(self.A_x @ X[:, k + 1] <= self.b_x + psi[b_x_ind, k])
+            opti.subject_to(self.A_u @ U[:, k] <= self.b_u + psi[b_u_ind, k])
+
+            opti.subject_to(X[3, k + 1] <= info['street speed limit'] + psi[v_limit_ind, k])
+
+            # System dynamics constraints
+            opti.subject_to(self.dynamics_constraints(X[:, k + 1], X[:, k], U[:, k]))
+
+        # Initial state
+        opti.subject_to(X[:, 0] == self.state)
+
+        opti.subject_to(X[3, -1] <= info['street speed limit'] + psi[v_limit_ind, -1])
+
+        # Agents avoidance
+        if len(agents) >= 1:
+            for nr_agent, id_agent in enumerate(agents):
+                agents[id_agent].trajecotry_estimation()
+                for k in range(self.N_SF + 1):
+                    if agents[id_agent].security_dist != 0:
+                        # opti.subject_to(self.agents_constraints(X[:, k], agents[id_agent]) >= 0)
+                        opti.subject_to(self.agents_constraints_traj(X[:, k], agents[id_agent].traj_estimation[:, k],
+                                                                     agents[id_agent]) >= psi[first_agent_ind + nr_agent, k])
+                    else:
+                        opti.subject_to(psi[first_agent_ind + nr_agent, k] == 0)
+
+        # Obstacle avoidance
+        if len(circular_obstacles) != 0:
+            for nr_obs, id_obst in enumerate(circular_obstacles):
+                for k in range(self.N_SF + 1):
+                    diff_x = (X[0, k] - circular_obstacles[id_obst]['center'][0]) ** 2 / (
+                    circular_obstacles[id_obst]['r_x']) ** 2
+                    diff_y = (X[1, k] - circular_obstacles[id_obst]['center'][1]) ** 2 / (
+                    circular_obstacles[id_obst]['r_y']) ** 2
+                    opti.subject_to(diff_x + diff_y >= 1 + psi[first_obst_ind + nr_obs, k])
+
+        # Constraint for the steady state
+        opti.subject_to(self.A_x @ x_s <= self.b_x + psi[b_x_ind, -1])
+        opti.subject_to(self.A_u @ u_s <= self.b_u + psi[b_u_ind, -1])
+        opti.subject_to(self.dynamics_constraints(x_s, x_s, u_s))
+        # Terminal constraints
+        opti.subject_to(X[:, -1] == x_s)  # x(N) == x_s
+
+        opti.minimize(cost)
+
+        # Solve the optimization problem
+        if t == 0:  # or agents[f'{i}'].target_status
+            self.trajecotry_estimation()
+            opti.set_initial(X, self.traj_estimation)
+            opti.set_initial(U, np.zeros((self.m, self.N)))
+            opti.set_initial(x_s, self.traj_estimation[:, -1])
+            opti.set_initial(u_s, np.array([[0 - self.traj_estimation[3, -1]], [0]]))
+            opti.set_initial(psi, np.zeros((nr_constraints, self.N_SF + 1)))
+
+        else:
+            opti.set_initial(X, self.previous_opt_sol_SF['X'])
+            opti.set_initial(U, self.previous_opt_sol_SF['U'])
+            opti.set_initial(x_s, self.previous_opt_sol_SF['x_s'])
+            opti.set_initial(u_s, self.previous_opt_sol_SF['u_s'])
+            opti.set_initial(psi, self.previous_opt_sol_SF['psi'])
+
+        try:
+            opti.solver('ipopt')
+            sol = opti.solve()
+        except Exception as e:
+            print(f"Optimization failed: {e}")
+
+        if opti.stats()['success']:
+            self.previous_opt_sol_SF_psi['X'] = sol.value(X)
+            self.previous_opt_sol_SF_psi['U'] = sol.value(U)
+            self.previous_opt_sol_SF_psi['x_s'] = sol.value(x_s)
+            self.previous_opt_sol_SF_psi['u_s'] = sol.value(u_s)
+            self.previous_opt_sol_SF_psi['psi'] = sol.value(psi)
+
+            cost = 0
+            for k in range(self.N_SF + 1):
+                cost += np.linalg.norm(sol.value(psi)[:, k]) ** 2
+            self.previous_opt_sol_soft_SF_psi['Cost'] = cost
+            self.success_solver_SF_psi = True
+            opt_psi = sol.value(psi)
+        else:
+            self.success_solver_SF_psi = False
+            #What you return?????
+            opt_psi = np.zeros((nr_constraints, self.N_SF + 1))
+
+        return opt_psi
+
+    def soft_SF(self, u_lernt, agents, circular_obstacles, t, info, psi):
+
+        opti = ca.Opti()
+
+        size_b_x = np.size(self.b_x)
+        size_b_u = np.size(self.b_u)
+
+        X = opti.variable(self.n, self.N_SF + 1)
+        U = opti.variable(self.m, self.N_SF)
+        x_s = opti.variable(self.n, 1)
+        u_s = opti.variable(self.m, 1)
+
+        cost = ca.norm_2(u_lernt - U[:, 0]) ** 2
+
+        for k in range(self.N_SF):
+            # State and Input constraints
+            opti.subject_to(self.A_x @ X[:, k + 1] <= self.b_x + psi[0:size_b_x, k])
+            opti.subject_to(self.A_u @ U[:, k] <= self.b_u + psi[size_b_x:size_b_x+size_b_u, k])
+
+            opti.subject_to(X[3, k + 1] <= info['street speed limit'] + psi[size_b_x+size_b_u, k])
+
+            # System dynamics constraints
+            opti.subject_to(self.dynamics_constraints(X[:, k + 1], X[:, k], U[:, k]))
+
+        # Initial state
+        opti.subject_to(X[:, 0] == self.state)
+
+        opti.subject_to(X[3, -1] <= info['street speed limit'] + psi[size_b_x+size_b_u, -1])
+
+        # Agents avoidance
+        if len(agents) >= 1:
+            for nr_agent, id_agent in enumerate(agents):
+                agents[id_agent].trajecotry_estimation()
+                for k in range(self.N_SF + 1):
+                    if agents[id_agent].security_dist != 0:
+                        # opti.subject_to(self.agents_constraints(X[:, k], agents[id_agent]) >= 0)
+                        opti.subject_to(self.agents_constraints_traj(X[:, k], agents[id_agent].traj_estimation[:, k],
+                                                                     agents[id_agent]) >= psi[size_b_x+size_b_u + nr_agent + 1, k])
+                    else:
+                        opti.subject_to(psi[size_b_x + size_b_u + nr_agent + 1, k] == 0)
+        nr_agents = len(agents)
+
+        # Obstacle avoidance
+        if len(circular_obstacles) != 0:
+            for nr_obs, id_obst in enumerate(circular_obstacles):
+                for k in range(self.N_SF + 1):
+                    diff_x = (X[0, k] - circular_obstacles[id_obst]['center'][0]) ** 2 / (
+                    circular_obstacles[id_obst]['r_x']) ** 2
+                    diff_y = (X[1, k] - circular_obstacles[id_obst]['center'][1]) ** 2 / (
+                    circular_obstacles[id_obst]['r_y']) ** 2
+                    opti.subject_to(diff_x + diff_y >= 1 + psi[size_b_x + size_b_u + nr_agents + nr_obs + 1, k])
+
+        # Constraint for the steady state
+        opti.subject_to(self.A_x @ x_s <= self.b_x + psi[0:size_b_x, -1])
+        opti.subject_to(self.A_u @ u_s <= self.b_u + psi[size_b_x:size_b_x+size_b_u, -1])
+        opti.subject_to(self.dynamics_constraints(x_s, x_s, u_s))
+        # Terminal constraints
+        opti.subject_to(X[:, -1] == x_s)  # x(N) == x_s
+
+        opti.minimize(cost)
+
+        # Solve the optimization problem
+        if t == 0:  # or agents[f'{i}'].target_status
+            self.trajecotry_estimation()
+            opti.set_initial(X, self.traj_estimation)
+            opti.set_initial(U, np.zeros((self.m, self.N)))
+            opti.set_initial(x_s, self.traj_estimation[:, -1])
+            opti.set_initial(u_s, np.array([[0 - self.traj_estimation[3, -1]], [0]]))
+        else:
+            opti.set_initial(X, self.previous_opt_sol_SF['X'])
+            opti.set_initial(U, self.previous_opt_sol_SF['U'])
+            opti.set_initial(x_s, self.previous_opt_sol_SF['x_s'])
+            opti.set_initial(u_s, self.previous_opt_sol_SF['u_s'])
+
+        try:
+            opti.solver('ipopt')
+            sol = opti.solve()
+        except Exception as e:
+            print(f"Optimization failed: {e}")
+
+        if opti.stats()['success']:
+            self.previous_opt_sol_SF['X'] = sol.value(X)
+            self.previous_opt_sol_SF['U'] = sol.value(U)
+            self.previous_opt_sol_SF['x_s'] = sol.value(x_s)
+            self.previous_opt_sol_SF['u_s'] = sol.value(u_s)
+            self.previous_opt_sol_SF['Cost'] = sol.value(np.linalg.norm(u_lernt - sol.value(U)[:, 0]) ** 2)
+
+            input = sol.value(U)[:, 0].reshape((self.m, 1))
+            self.success_solver_SF = True
+
+        else:
+            input = np.zeros((self.m, 1))
+            if self.acc_limits[0] > 0 - self.velocity:
+                input[0, :] = self.acc_limits[1]
+            else:
+                input[0, :] = 0 - self.velocity
+            input[1, :] = 0
+
+            print('SF solver failed. Use a default input u = ', input)
+            self.success_solver_SF = False
+
+        return input
+
     def soft_OD_const(self, opti, obj, llm, X, U, agents, epsilon):
 
         x = X[0]
@@ -824,3 +1044,117 @@ class Vehicle:
             count += 1
 
         return obj, opti
+
+    def llm_conditioned_mpc(self, action, agents, circular_obstacles, t, info):
+
+        opti = ca.Opti()
+
+        X = opti.variable(self.n, self.N_SF + 1)
+        U = opti.variable(self.m, self.N_SF)
+        #x_s = opti.variable(self.n, 1)
+        #u_s = opti.variable(self.m, 1)
+
+        cost = 0
+        for k in range(self.N):
+            if 'go to the entry' in action:
+                cost += ca.norm_2(X[:, k] - self.entry['state']) ** 2
+            elif 'go to the exit' in action:
+                cost += ca.norm_2(X[:, k] - self.exit['state']) ** 2
+            elif 'go to the final_target' in action:
+                cost += ca.norm_2(X[:, k] - self.final_target['state']) ** 2
+
+            # State and Input constraints
+            opti.subject_to(self.A_x @ X[:, k + 1] <= self.b_x)
+            opti.subject_to(self.A_u @ U[:, k] <= self.b_u)
+
+            opti.subject_to(X[3, k + 1] <= info['street speed limit'])
+
+            # System dynamics constraints
+            opti.subject_to(self.dynamics_constraints(X[:, k + 1], X[:, k], U[:, k]))
+
+        # Initial state
+        opti.subject_to(X[:, 0] == self.state)
+
+        opti.subject_to(X[3, -1] <= info['street speed limit'])
+
+        # Agents avoidance
+        if len(agents) >= 1:
+            for id_agent in agents:
+                agents[id_agent].trajecotry_estimation()
+                for k in range(self.N_SF + 1):
+                    if agents[id_agent].security_dist != 0:
+                        #opti.subject_to(self.agents_constraints(X[:, k], agents[id_agent]) >= 0)
+                        opti.subject_to(self.agents_constraints_traj(X[:, k], agents[id_agent].traj_estimation[:, k], agents[id_agent]) >= 0)
+
+        # Obstacle avoidance
+        if len(circular_obstacles) != 0:
+            for id_obst in circular_obstacles:
+                for k in range(self.N_SF + 1):
+                    diff_x = (X[0, k] - circular_obstacles[id_obst]['center'][0]) ** 2 / (circular_obstacles[id_obst]['r_x']) ** 2
+                    diff_y = (X[1, k] - circular_obstacles[id_obst]['center'][1]) ** 2 / (circular_obstacles[id_obst]['r_y']) ** 2
+                    opti.subject_to(diff_x + diff_y >= 1)
+
+        # Constraint for the steady state
+        #opti.subject_to(self.A_x @ x_s <= self.b_x)
+        #opti.subject_to(self.A_u @ u_s <= self.b_u)
+        #opti.subject_to(self.dynamics_constraints(x_s, x_s, u_s))
+        # Terminal constraints
+        #opti.subject_to(X[:, -1] == x_s)  # x(N) == x_s
+
+        if 'go to the entry' in action:
+            cost += ca.norm_2(X[:, -1] - self.entry['state']) ** 2
+        elif 'go to the exit' in action:
+            cost += ca.norm_2(X[:, -1] - self.exit['state']) ** 2
+        elif 'go to the final_target' in action:
+            cost += ca.norm_2(X[:, -1] - self.final_target['state']) ** 2
+
+        opti.minimize(cost)
+
+        # Solve the optimization problem
+        if t == 0:  # or agents[f'{i}'].target_status
+            self.trajecotry_estimation()
+            opti.set_initial(X, self.traj_estimation)
+            opti.set_initial(U, np.zeros((self.m, self.N)))
+            #opti.set_initial(x_s, self.traj_estimation[:, -1])
+            #opti.set_initial(u_s, np.array([[0 - self.traj_estimation[3, -1]], [0]]))
+        else:
+            opti.set_initial(X, self.previous_opt_sol['X'])
+            opti.set_initial(U, self.previous_opt_sol['U'])
+            #opti.set_initial(x_s, self.previous_opt_sol['x_s'])
+            #opti.set_initial(u_s, self.previous_opt_sol['u_s'])
+
+        try:
+            opti.solver('ipopt')
+            sol = opti.solve()
+        except Exception as e:
+            print(f"Optimization failed: {e}")
+
+        if opti.stats()['success']:
+            self.previous_opt_sol['X'] = sol.value(X)
+            self.previous_opt_sol['U'] = sol.value(U)
+            #self.previous_opt_sol['x_s'] = sol.value(x_s)
+            #self.previous_opt_sol['u_s'] = sol.value(u_s)
+            self.previous_opt_sol['Cost'] = sol.value(cost)
+            #if 'go to the entry' in action:
+            #    self.previous_opt_sol['Cost'] = np.linalg.norm(sol.value(X) - self.entry['state']) ** 2
+            #elif 'go to the exit' in action:
+            #   self.previous_opt_sol['Cost'] = np.linalg.norm(sol.value(X) - self.exit['state']) ** 2
+            #elif 'go to the final_target' in action:
+            #    self.previous_opt_sol['Cost'] = np.linalg.norm(sol.value(X) - self.final_target['state']) ** 2
+
+            input = sol.value(U)[:, 0].reshape((self.m, 1))
+            self.success_solver_MPC_LLM = True
+
+        else:
+
+            input = np.zeros((self.m, 1))
+            if self.acc_limits[0] > 0 - self.velocity:
+                input[0, :] = self.acc_limits[1]
+            else:
+                input[0, :] = 0 - self.velocity
+            input[1, :] = 0
+
+            print('SF solver failed. Use a default input u = ', input)
+            self.success_solver_MPC_LLM = False
+
+        return input
