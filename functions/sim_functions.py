@@ -54,6 +54,8 @@ def sim_init(counter, type_simulation):
     if SimulationParam['With LLM car']:
         if type_simulation == "safe_narrate":
             Language_Module = LLM(SimulationParam['Describer active'])
+            if SimulationParam['Controller']['Ego']['LLM']['Reasoning']:
+                Language_Module.reasoning_active = True
             start = time.time()
             Language_Module.call_TP(env, SimulationParam['Query'], agents, ego_vehicle, 0)
             end = time.time()

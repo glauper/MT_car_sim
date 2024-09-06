@@ -8,10 +8,10 @@ def SimulationConfig():
                        'With LLM car': True,
                        'Describer active': False,
                        'Timestep': 0.2, # [s]
-                       'Environment': 0,
-                       #'Query': 'go straight to the exit in front of you',
+                       'Environment': 4,
+                       'Query': 'go straight to the exit in front of you',
                        #'Query': 'go to the exit on the right',
-                       'Query': 'go to the exit on the left',
+                       #'Query': 'go to the exit on the left',
                        'Controller': {
                            'Agents': {
                                'Type': "tracking MPC",
@@ -19,7 +19,7 @@ def SimulationConfig():
                            },
                            'Ego': {
                                'SF': {
-                                   'Active': False,
+                                   'Active': True,
                                    'Horizon': 20,
                                    'Replan': {
                                        'Active': False,
@@ -30,8 +30,9 @@ def SimulationConfig():
                                },
                                'LLM': {
                                    'Horizon': 20,
-                                   'Soft': False,
-                                   'Terminal set': False
+                                   'Soft': True,
+                                   'Terminal set': False,
+                                   'Reasoning': False
                                }
                            }
                        }

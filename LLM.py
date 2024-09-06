@@ -4,7 +4,7 @@ from openai import OpenAI
 from prompts.prompts import (general_OD_prompt, specific_OD_prompt, general_TP_prompt, specific_TP_prompt,
                              general_DE_prompt,specific_DE_prompt, TP_prompt_with_DE, LLM_conditioned_MPC_general,
                              LLM_conditioned_MPC_specific, prompt_LLM_coder_general, prompt_LLM_coder_specific,
-                             prompt_LLM_correction_general)
+                             prompt_LLM_correction_general, general_TP_reasoning_prompt, specific_TP_reasoning_prompt)
 from functions.plot_functions import plot_frame_for_describer
 import base64
 import numpy as np
@@ -22,6 +22,7 @@ class LLM:
         self.DE = {}
         self.DE_active = DE_active
         self.DE_messages = []
+        self.reasoning_active = False
 
         self.LLM_coder_messages = []
         self.LLM_coder = {}
@@ -33,6 +34,10 @@ class LLM:
         if self.DE_active:
             DE_description = self.call_DE(env, agents, ego, query, t)
             user_input = TP_prompt_with_DE(DE_description)
+        elif self.reasoning_active:
+            prompt = general_TP_reasoning_prompt()
+            description = specific_TP_reasoning_prompt(env, agents, ego, query)
+            user_input = prompt + description
         else:
             prompt = general_TP_prompt()
             description = specific_TP_prompt(env, agents, ego, query)
@@ -78,6 +83,9 @@ class LLM:
         if self.DE_active:
             DE_description = self.call_DE(env, agents, ego, query, t)
             user_input = motivation + DE_description
+        elif self.reasoning_active:
+            description = specific_TP_reasoning_prompt(env, agents, ego, query)
+            user_input = motivation + description
         else:
             description = specific_TP_prompt(env, agents, ego, query)
             user_input = motivation + description
@@ -577,7 +585,7 @@ Description of the actual situation:
 
         chat_completion = client.chat.completions.create(
             messages=message,
-            model="gpt-4o",  # gpt-4-turbo, gpt-3.5-turbo-0125, gpt-4o
+            model="gpt-3.5-turbo-0125f",  # gpt-4-turbo, gpt-3.5-turbo-0125, gpt-4o
             response_format={"type": "text"},
         )
 

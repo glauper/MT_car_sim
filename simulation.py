@@ -7,6 +7,7 @@ import os
 from functions.plot_functions import plot_simulation, input_animation, save_all_frames
 from functions.sim_functions import (results_update_and_save, sim_init, sim_reload, check_proximity, check_crash,
                                           check_need_replan)
+
 path_folder= os.path.join(os.path.dirname(__file__), ".", f"prompts/output_LLM/frames/")
 shutil.rmtree(path_folder)
 os.makedirs(path_folder)
@@ -34,6 +35,8 @@ while run_simulation:
     print("Simulation time: ", t)
     if SimulationParam['With LLM car']:
         print('Task: ', Language_Module.TP['tasks'][Language_Module.task_status])
+        if SimulationParam['Controller']['Ego']['LLM']['Reasoning']:
+            print('Reasons: ', Language_Module.TP['reasons'][Language_Module.task_status])
 
     # Save the results
     if SimulationParam['With LLM car']:
@@ -196,8 +199,8 @@ while run_simulation:
         agents = priority.NoPriority(agents, order_optimization, SimulationParam['With LLM car'])
         ego_vehicle = agents.pop(str(len(agents)-1))
     else:
-        #agents = priority.SwissPriority(agents, order_optimization, SimulationParam['With LLM car'])
-        agents = priority.NoPriority(agents, order_optimization, SimulationParam['With LLM car'])
+        agents = priority.SwissPriority(agents, order_optimization, SimulationParam['With LLM car'])
+        #agents = priority.NoPriority(agents, order_optimization, SimulationParam['With LLM car'])
 
     # update the velocity limit in the new street for other agents and check i there are crush
     for name_agent in agents:

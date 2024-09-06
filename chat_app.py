@@ -46,8 +46,8 @@ if 'change_task' not in st.session_state:
 if 'figures' not in st.session_state:
     st.session_state.figures = []
 
-# Divide the page into two columns
-col1, col2, col3 = st.columns([1.5,1,1])
+# Divide the page into three columns
+col1, col2, col3 = st.columns([1.5,1.5,1])
 
 
 # Right column: Plot
@@ -84,9 +84,9 @@ with (col1):
             if 'Optimization Designer' in messages[k+1].keys() and messages[k+1]['time'] == st.session_state.step:
                 st.session_state.chat_history.insert(2,{'role': 'User', 'content': message})
                 #message = f"Time t = {st.session_state.step}:\n" + """
-                message = """objective = """ + str(messages[k+1]['Optimization Designer']['objective']) + """
-equality_constraints = """ + str(messages[k + 1]['Optimization Designer']['equality_constraints']) + """
-inequality_constraints = """ + str(messages[k + 1]['Optimization Designer']['inequality_constraints'])
+                message = """obj = """ + str(messages[k+1]['Optimization Designer']['objective']) + """
+eq_constr = """ + str(messages[k + 1]['Optimization Designer']['equality_constraints']) + """
+ineq_constr = """ + str(messages[k + 1]['Optimization Designer']['inequality_constraints'])
                 st.session_state.chat_history.insert(3, {'role': 'Optimization Designer', 'content': message})
                 with st.chat_message('Optimization Designer'):
                     st.code(message)
