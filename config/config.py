@@ -8,7 +8,7 @@ def SimulationConfig():
                        'With LLM car': True,
                        'Describer active': False,
                        'Timestep': 0.2, # [s]
-                       'Environment': 4,
+                       'Environment': 0,
                        'Query': 'go straight to the exit in front of you',
                        #'Query': 'go to the exit on the right',
                        #'Query': 'go to the exit on the left',
@@ -26,7 +26,7 @@ def SimulationConfig():
                                        'toll': 10
                                    },
                                    'Use LLM output': False,
-                                   'Soft': False
+                                   'Soft': True
                                },
                                'LLM': {
                                    'Horizon': 20,

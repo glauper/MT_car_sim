@@ -9,6 +9,8 @@ import pickle
 from config.config import SimulationConfig, EnviromentConfig
 from priority_controller import PriorityController
 from vehicle import Vehicle
+from pedestrian import Pedestrian
+from bicycle import Bicycle
 from llm import LLM
 
 def sim_init(counter, type_simulation):
@@ -21,22 +23,31 @@ def sim_init(counter, type_simulation):
     agents = agents_init(env, delta_t, SimulationParam)
 
     presence_emergency_car = False
+    name_pedestrian = []
     distance = []
     for name_vehicle in agents:
         if agents[name_vehicle].type == 'emergency car':
             presence_emergency_car = True
             name_emergency_car = name_vehicle
+        elif agents[name_vehicle].type in env['Pedestrians Specification']['types']:
+            name_pedestrian.append(name_vehicle)
         else:
             distance.append(np.linalg.norm(agents[name_vehicle].position))
 
     order_optimization = list(agents.keys())
     if presence_emergency_car:
         order_optimization.remove(name_emergency_car)
+    if len(name_pedestrian) > 0:
+        for name_ped in name_pedestrian:
+            order_optimization.remove(name_ped)
     pairs = list(zip(order_optimization, distance))
     sorted_pairs = sorted(pairs, key=lambda x: x[1])
     order_optimization = [pair[0] for pair in sorted_pairs]
     if presence_emergency_car:
-        order_optimization.insert(0, name_emergency_car)
+        order_optimization.append(name_emergency_car)
+    if len(name_pedestrian) > 0:
+        for name_ped in name_pedestrian:
+            order_optimization.insert(0, name_ped)
 
     if SimulationParam['With LLM car']:
         type = env['Vehicle Specification']['types'][0]
@@ -165,12 +176,14 @@ def sim_reload():
 def agents_init(env, delta_t, SimulationParam):
     agents = {}
     options_init_state = list(env['Entrances'].keys())
-    nr_type_vehicles = len(env['Vehicle Specification']['types'])
+    nr_emergency_vehicles = env['Number Emergency Vehicles']
+    count_emergency_vehicles = 0
 
     for i in range(env['Number Vehicles']):
         # put a vehicle for each type different from emergency_car
-        if nr_type_vehicles > 1 and i < nr_type_vehicles - 1:
-            type = env['Vehicle Specification']['types'][i + 1]
+        if count_emergency_vehicles < nr_emergency_vehicles:
+            type = env['Vehicle Specification']['types'][1]
+            count_emergency_vehicles += 1
         else:
             type = env['Vehicle Specification']['types'][0]
         info_vehicle = env['Vehicle Specification'][type]
@@ -183,6 +196,36 @@ def agents_init(env, delta_t, SimulationParam):
         agents[f'{i}'].init_trackingMPC(SimulationParam['Controller']['Agents']['Horizon'])
         if SimulationParam['Environment'] == 5:
             agents[f'{i}'] = env_5_init(agents[f'{i}'])
+
+    nr_vehicles = len(agents)
+    for i in range(env['Number Pedestrians']):
+        if i % 2 == 0:
+            type = 'adult'
+            info_adult = env['Pedestrians Specification']['adult']
+            agents[f'{i + nr_vehicles}'] = Pedestrian(type, info_adult, delta_t)
+            agents[f'{i + nr_vehicles}'].init(env['State space'],
+                                              env['Pedestrians Specification']['adult']['velocity limits'],
+                                              SimulationParam['Controller']['Agents']['Horizon'])
+            agents[f'{i + nr_vehicles}'].trajecotry_estimation()
+        else:
+            type = 'children'
+            info_children = env['Pedestrians Specification']['children']
+            agents[f'{i + nr_vehicles}'] = Pedestrian(type, info_children, delta_t)
+            agents[f'{i + nr_vehicles}'].init(env['State space'],
+                                              env['Pedestrians Specification']['children']['velocity limits'],
+                                              SimulationParam['Controller']['Agents']['Horizon'])
+            agents[f'{i + nr_vehicles}'].trajecotry_estimation()
+
+    nr_agents = len(agents)
+    for i in range(env['Number Bicycles']):
+        info_bicycle = env['Bicycle Specification']['bicycle']
+        type = 'bicycle'
+        agents[f'{i + nr_agents}'] = Bicycle(type, info_bicycle, delta_t)
+        key_init = random.choice(options_init_state)
+        agents[f'{i + nr_agents}'].init_state(env, key_init)
+        agents[f'{i + nr_agents}'].init_system_constraints(env["State space"], env['Entrances'][key_init]['speed limit'])
+        options_init_state.remove(key_init)
+        agents[f'{i + nr_agents}'].init_trackingMPC(SimulationParam['Controller']['Agents']['Horizon'])
 
     return agents
 
@@ -240,24 +283,33 @@ def results_init(env, agents):
         results[f'agent {id_vehicle}'] = {}
         results[f'agent {id_vehicle}']['type'] = agents[f'{id_vehicle}'].type
 
-        results[f'agent {id_vehicle}']['x coord'] = []
-        results[f'agent {id_vehicle}']['y coord'] = []
-        results[f'agent {id_vehicle}']['velocity'] = []
-        results[f'agent {id_vehicle}']['theta'] = []
-
-        results[f'agent {id_vehicle}']['x coord pred'] = []
-        results[f'agent {id_vehicle}']['y coord pred'] = []
-        if agents[f'{id_vehicle}'].LLM_car:
-            results[f'agent {id_vehicle}']['x coord pred SF'] = []
-            results[f'agent {id_vehicle}']['y coord pred SF'] = []
-            results[f'agent {id_vehicle}']['acc pred SF'] = []
-            results[f'agent {id_vehicle}']['acc pred LLM'] = []
-            results[f'agent {id_vehicle}']['steering angle pred SF'] = []
-            results[f'agent {id_vehicle}']['steering angle pred LLM'] = []
-        else:
-            agents[f'{id_vehicle}'].trajecotry_estimation()
+        if results[f'agent {id_vehicle}']['type'] == 'adult' or results[f'agent {id_vehicle}']['type'] == 'children':
+            results[f'agent {id_vehicle}']['x coord'] = []
+            results[f'agent {id_vehicle}']['y coord'] = []
+            results[f'agent {id_vehicle}']['v_x coord'] = []
+            results[f'agent {id_vehicle}']['v_y coord'] = []
             results[f'agent {id_vehicle}']['trajectory estimation x'] = []
             results[f'agent {id_vehicle}']['trajectory estimation y'] = []
+
+        else:
+            results[f'agent {id_vehicle}']['x coord'] = []
+            results[f'agent {id_vehicle}']['y coord'] = []
+            results[f'agent {id_vehicle}']['velocity'] = []
+            results[f'agent {id_vehicle}']['theta'] = []
+
+            results[f'agent {id_vehicle}']['x coord pred'] = []
+            results[f'agent {id_vehicle}']['y coord pred'] = []
+            if agents[f'{id_vehicle}'].LLM_car:
+                results[f'agent {id_vehicle}']['x coord pred SF'] = []
+                results[f'agent {id_vehicle}']['y coord pred SF'] = []
+                results[f'agent {id_vehicle}']['acc pred SF'] = []
+                results[f'agent {id_vehicle}']['acc pred LLM'] = []
+                results[f'agent {id_vehicle}']['steering angle pred SF'] = []
+                results[f'agent {id_vehicle}']['steering angle pred LLM'] = []
+            else:
+                agents[f'{id_vehicle}'].trajecotry_estimation()
+                results[f'agent {id_vehicle}']['trajectory estimation x'] = []
+                results[f'agent {id_vehicle}']['trajectory estimation y'] = []
 
     results_path = os.path.join(os.path.dirname(__file__), ".", "../save_results/results.txt")
     env_path = os.path.join(os.path.dirname(__file__), ".", "../save_results/env.txt")
@@ -271,29 +323,37 @@ def results_init(env, agents):
 def results_update_and_save(env, agents, results, ego_brake):
 
     for id_vehicle, name_vehicle in enumerate(agents):
-        results[f'agent {id_vehicle}']['x coord'].append(float(agents[name_vehicle].x))
-        results[f'agent {id_vehicle}']['y coord'].append(float(agents[name_vehicle].y))
-        results[f'agent {id_vehicle}']['velocity'].append(float(agents[name_vehicle].velocity))
-        results[f'agent {id_vehicle}']['theta'].append(float(agents[name_vehicle].theta))
-
-        results[f'agent {id_vehicle}']['x coord pred'].append(list(agents[name_vehicle].previous_opt_sol['X'][0,:]))
-        results[f'agent {id_vehicle}']['y coord pred'].append(list(agents[name_vehicle].previous_opt_sol['X'][1,:]))
-        if agents[name_vehicle].LLM_car:
-            results[f'agent {id_vehicle}']['x coord pred SF'].append(list(agents[name_vehicle].previous_opt_sol_SF['X'][0,:]))
-            results[f'agent {id_vehicle}']['y coord pred SF'].append(list(agents[name_vehicle].previous_opt_sol_SF['X'][1,:]))
-            if ego_brake:
-                results[f'agent {id_vehicle}']['acc pred SF'].append(float(agents[name_vehicle].input_brakes[0]))
-                results[f'agent {id_vehicle}']['acc pred LLM'].append(float(agents[name_vehicle].input_brakes[0]))
-                results[f'agent {id_vehicle}']['steering angle pred SF'].append(float(agents[name_vehicle].input_brakes[1]))
-                results[f'agent {id_vehicle}']['steering angle pred LLM'].append(float(agents[name_vehicle].input_brakes[1]))
-            else:
-                results[f'agent {id_vehicle}']['acc pred SF'].append(float(agents[name_vehicle].previous_opt_sol_SF['U'][0,0]))
-                results[f'agent {id_vehicle}']['acc pred LLM'].append(float(agents[name_vehicle].previous_opt_sol['U'][0,0]))
-                results[f'agent {id_vehicle}']['steering angle pred SF'].append(float(agents[name_vehicle].previous_opt_sol_SF['U'][1,0]))
-                results[f'agent {id_vehicle}']['steering angle pred LLM'].append(float(agents[name_vehicle].previous_opt_sol['U'][1,0]))
-        else:
+        if results[f'agent {id_vehicle}']['type'] == 'adult' or results[f'agent {id_vehicle}']['type'] == 'children':
+            results[f'agent {id_vehicle}']['x coord'].append(float(agents[name_vehicle].x))
+            results[f'agent {id_vehicle}']['y coord'].append(float(agents[name_vehicle].y))
+            results[f'agent {id_vehicle}']['v_x coord'].append(float(agents[name_vehicle].v_x))
+            results[f'agent {id_vehicle}']['v_y coord'].append(float(agents[name_vehicle].v_y))
             results[f'agent {id_vehicle}']['trajectory estimation x'].append(list(agents[name_vehicle].traj_estimation[0]))
             results[f'agent {id_vehicle}']['trajectory estimation y'].append(list(agents[name_vehicle].traj_estimation[1]))
+        else:
+            results[f'agent {id_vehicle}']['x coord'].append(float(agents[name_vehicle].x))
+            results[f'agent {id_vehicle}']['y coord'].append(float(agents[name_vehicle].y))
+            results[f'agent {id_vehicle}']['velocity'].append(float(agents[name_vehicle].velocity))
+            results[f'agent {id_vehicle}']['theta'].append(float(agents[name_vehicle].theta))
+
+            results[f'agent {id_vehicle}']['x coord pred'].append(list(agents[name_vehicle].previous_opt_sol['X'][0,:]))
+            results[f'agent {id_vehicle}']['y coord pred'].append(list(agents[name_vehicle].previous_opt_sol['X'][1,:]))
+            if agents[name_vehicle].LLM_car:
+                results[f'agent {id_vehicle}']['x coord pred SF'].append(list(agents[name_vehicle].previous_opt_sol_SF['X'][0,:]))
+                results[f'agent {id_vehicle}']['y coord pred SF'].append(list(agents[name_vehicle].previous_opt_sol_SF['X'][1,:]))
+                if ego_brake:
+                    results[f'agent {id_vehicle}']['acc pred SF'].append(float(agents[name_vehicle].input_brakes[0]))
+                    results[f'agent {id_vehicle}']['acc pred LLM'].append(float(agents[name_vehicle].input_brakes[0]))
+                    results[f'agent {id_vehicle}']['steering angle pred SF'].append(float(agents[name_vehicle].input_brakes[1]))
+                    results[f'agent {id_vehicle}']['steering angle pred LLM'].append(float(agents[name_vehicle].input_brakes[1]))
+                else:
+                    results[f'agent {id_vehicle}']['acc pred SF'].append(float(agents[name_vehicle].previous_opt_sol_SF['U'][0,0]))
+                    results[f'agent {id_vehicle}']['acc pred LLM'].append(float(agents[name_vehicle].previous_opt_sol['U'][0,0]))
+                    results[f'agent {id_vehicle}']['steering angle pred SF'].append(float(agents[name_vehicle].previous_opt_sol_SF['U'][1,0]))
+                    results[f'agent {id_vehicle}']['steering angle pred LLM'].append(float(agents[name_vehicle].previous_opt_sol['U'][1,0]))
+            else:
+                results[f'agent {id_vehicle}']['trajectory estimation x'].append(list(agents[name_vehicle].traj_estimation[0]))
+                results[f'agent {id_vehicle}']['trajectory estimation y'].append(list(agents[name_vehicle].traj_estimation[1]))
 
     results_path = os.path.join(os.path.dirname(__file__), ".","../save_results/results.txt")
     env_path = os.path.join(os.path.dirname(__file__), ".", "../save_results/env.txt")
@@ -443,48 +503,44 @@ def check_need_replan(ego_vehicle, agents, Language_Module, env, SimulationParam
             counter['TP calls'] += 1
             ego_vehicle.success_solver_MPC_LLM = True
         elif SimulationParam['Controller']['Ego']['SF']['Active'] and not ego_vehicle.success_solver_SF:
-            print('Call TP: because no success of SF.')
             ego_vehicle.t_subtask = 0
-            reason['SF_not_solved'] = True
+            if SimulationParam['Controller']['Ego']['SF']['Soft']:
+                print('Call TP: because no success for solver soft SF.')
+                reason['soft_SF_not_solved'] = True
+            else:
+                print('Call TP: because no success of SF.')
+                reason['SF_not_solved'] = True
             start = time.time()
             Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
             end = time.time()
             counter['elapsed time for LLM'].append(end - start)
             counter['TP calls'] += 1
             ego_vehicle.success_solver_SF = True
-        elif ego_vehicle.SF_soft_active and ego_vehicle.previous_opt_sol_soft_SF_psi['Cost'] > 0:
-            print('Call TP: because the cost of soft SF psi are higher then zero.')
-            ego_vehicle.t_subtask = 0
-            reason['soft_SF_kicks_in'] = True
-            start = time.time()
-            Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
-            end = time.time()
-            counter['elapsed time for LLM'].append(end - start)
-            counter['TP calls'] += 1
-            ego_vehicle.success_solver_SF_psi = True
-            ego_vehicle.success_solver_SF = True
-        elif ego_vehicle.SF_soft_active and not ego_vehicle.success_solver_SF_psi:
-            print('Call TP: because no success for solver soft SF psi.')
-            ego_vehicle.t_subtask = 0
-            reason['soft_SF_psi_not_solved'] = True
-            start = time.time()
-            Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
-            end = time.time()
-            counter['elapsed time for LLM'].append(end - start)
-            counter['TP calls'] += 1
-            ego_vehicle.success_solver_SF_psi = True
-            ego_vehicle.success_solver_SF = True
-        elif ego_vehicle.SF_soft_active and not ego_vehicle.success_solver_SF:
-            print('Call TP: because no success for solver soft SF.')
-            ego_vehicle.t_subtask = 0
-            reason['soft_SF_not_solved'] = True
-            start = time.time()
-            Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
-            end = time.time()
-            counter['elapsed time for LLM'].append(end - start)
-            counter['TP calls'] += 1
-            ego_vehicle.success_solver_SF_psi = True
-            ego_vehicle.success_solver_SF = True
+        elif SimulationParam['Controller']['Ego']['SF']['Soft']:
+            replan_flag = False
+            soft_SF_trashold = 1
+            for k in range(ego_vehicle.N_SF + 1):
+                if np.linalg.norm(ego_vehicle.previous_opt_sol_SF['psi_b_x'][:, k]) > soft_SF_trashold:
+                    replan_flag = True
+                    counter['slack SF'].append(['time ' + str(t) + ': psi_b_x k = ' + str(k), list(ego_vehicle.previous_opt_sol_SF['psi_b_x'][:, k])])
+                #elif np.linalg.norm(ego_vehicle.previous_opt_sol_SF['psi_v_limit'][k]) > soft_SF_trashold:
+                #    replan_flag = True
+                elif np.linalg.norm(ego_vehicle.previous_opt_sol_SF['psi_agents'][:, k]) > soft_SF_trashold:
+                    replan_flag = True
+                    counter['slack SF'].append(['time ' + str(t) + ': psi_agents k = ' + str(k), list(ego_vehicle.previous_opt_sol_SF['psi_agents'][:, k])])
+                elif np.linalg.norm(ego_vehicle.previous_opt_sol_SF['psi_obst'][:, k]) > soft_SF_trashold:
+                    replan_flag = True
+                    counter['slack SF'].append(['time ' + str(t) + ': psi_obst k = ' + str(k), list(ego_vehicle.previous_opt_sol_SF['psi_obst'][:, k])])
+            if replan_flag == True:
+                print('Call TP: because the slack variable of soft SF are higher then treshold.')
+                ego_vehicle.t_subtask = 0
+                reason['soft_SF_kicks_in'] = True
+                start = time.time()
+                Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
+                end = time.time()
+                counter['elapsed time for LLM'].append(end - start)
+                counter['TP calls'] += 1
+                ego_vehicle.success_solver_SF = True
 
     return run_simulation, counter
 

@@ -1,0 +1,242 @@
+{"env": {
+	"Number Vehicles": 2,
+	"Number Pedestrians": 2,
+	"Number Bicycles": 2,
+	"State space": {
+		"x limits": [-25, 25],
+		"y limits": [-25, 25]
+	},
+	"Priority space": {
+		"x limits": [-9, 9],
+		"y limits": [-9, 9]
+	},
+	"Road Limits": {
+		"0": {
+			"line x": [-25, -6],
+			"line y": [6, 6],
+			"center": [-16, 6],
+			"radius": [10, 0.5]},
+		"1": {
+			"line x": [-6, -6],
+			"line y": [6, 25],
+			"center": [-6, 16],
+			"radius": [0.5, 10]},
+		"2": {
+			"line x": [6, 6],
+			"line y": [25, 6],
+			"center": [6, 16],
+			"radius": [0.5, 10]},
+		"3": {
+			"line x": [6, 25],
+			"line y": [6, 6],
+			"center": [16, 6],
+			"radius": [10, 0.5]},
+		"4": {
+			"line x": [6, 25],
+			"line y": [-6, -6],
+			"center": [16, -6],
+			"radius": [10, 0.5]},
+		"5": {
+			"line x": [6, 6],
+			"line y": [-6, -25],
+			"center": [6, -16],
+			"radius": [0.5, 10]},
+		"6": {
+			"line x": [-6, -6],
+			"line y": [-6, -25],
+			"center": [-6, -16],
+			"radius": [0.5, 10]},
+		"7": {
+			"line x": [-6, -25],
+			"line y": [-6, -6],
+			"center": [-16, -6],
+			"radius": [10, 0.5]}
+		},
+
+	"Pedestrians Specification": {
+		"types": ["adult", "children"],
+		"adult": {
+			"radius": 3,
+			"length": 1.5,
+			"width": 1.5,
+			"security distance": 4,
+			"a security dist": 3,
+			"b security dist": 3,
+			"velocity limits": [-0.5, 0.5],
+			"acceleration limits": [-1, 1]
+		},
+		"children": {
+			"radius": 2,
+			"length": 1,
+			"width": 1,
+			"security distance": 4,
+			"a security dist": 3,
+			"b security dist": 3,
+			"velocity limits": [-0.2, 0.2],
+			"acceleration limits": [-1, 1]
+		}
+	},
+	"Vehicle Specification": {
+		"types": ["standard car"],
+		"standard car": {
+			"length": 3,
+			"width": 2,
+			"l_f": 1,
+			"l_r": 1,
+			"security distance": 4,
+			"a security dist": 4,
+			"b security dist": 4,
+			"velocity limits": [-1, 33],
+			"acceleration limits": [-3, 3],
+			"steering angle limits": [-60, 60]
+		}
+	},
+	"Bicycle Specification": {
+		"types": ["bicycle"],
+		"bicycle": {
+			"length": 1.5,
+			"width": 1,
+			"l_f": 0.25,
+			"l_r": 0.25,
+			"security distance": 4,
+			"a security dist": 4,
+			"b security dist": 4,
+			"velocity limits": [-1, 2],
+			"acceleration limits": [-1, 1],
+			"steering angle limits": [-60, 60]
+		}
+	},
+	"Ego Entrance": {
+		"position": [3, -20],
+		"orientation": 90,
+		"speed limit": 2,
+		"offset": [0, 5],
+		"targets": [0],
+		"waypoints": [[3, -8]]
+	},
+	"Entrances": {
+		"0": {
+			"position": [-15.5, -3],
+			"orientation": 0,
+			"speed limit": 2,
+			"offset": [5, 0],
+			"targets": [1, 2, 3],
+			"waypoints": [[-8, -3]]
+		},
+		"1": {
+			"position": [-10, -3],
+			"orientation": 0,
+			"speed limit": 2,
+			"offset": [5, 0],
+			"targets": [1, 2, 3],
+			"waypoints": [[-8, -3]]
+		},
+		"2": {
+			"position": [-24.5, -3],
+			"orientation": 0,
+			"speed limit": 2,
+			"offset": [5, 0],
+			"targets": [1, 2, 3],
+			"waypoints": [[-8, -3]]
+		},
+		"3": {
+			"position": [-20, -3],
+			"orientation": 0,
+			"speed limit": 2,
+			"offset": [5, 0],
+			"targets": [1, 2, 3],
+			"waypoints": [[-8, -3]]
+		},
+		"4": {
+			"position": [10, 3],
+			"orientation": 180,
+			"speed limit": 2,
+			"offset": [-5, 0],
+			"targets": [1, 0, 3],
+			"waypoints": [[8, 3]]
+		},
+		"5": {
+			"position": [20, 3],
+			"orientation": 180,
+			"speed limit": 2,
+			"offset": [-5, 0],
+			"targets": [1, 0, 3],
+			"waypoints": [[8, 3]]
+		},
+		"6": {
+			"position": [15.5, 3],
+			"orientation": 180,
+			"speed limit": 2,
+			"offset": [-5, 0],
+			"targets": [1, 0, 3],
+			"waypoints": [[8, 3]]
+		},
+		"7": {
+			"position": [24.5, 3],
+			"orientation": 180,
+			"speed limit": 2,
+			"offset": [-5, 0],
+			"targets": [1, 0, 3],
+			"waypoints": [[8, 3]]
+		},
+		"8": {
+			"position": [-3, 24.5],
+			"orientation": -90,
+			"speed limit": 2,
+			"offset": [0, -5],
+			"targets": [1, 2, 0],
+			"waypoints": [[-3, 8]]
+		},
+		"9": {
+			"position": [-3, 15.5],
+			"orientation": -90,
+			"speed limit": 2,
+			"offset": [0, -5],
+			"targets": [1, 2, 0],
+			"waypoints": [[-3, 8]]
+		},
+		"10": {
+			"position": [-3, 20],
+			"orientation": -90,
+			"speed limit": 2,
+			"offset": [0, -5],
+			"targets": [1, 2, 0],
+			"waypoints": [[-3, 8]]
+		},
+		"11": {
+			"position": [-3, 10],
+			"orientation": -90,
+			"speed limit": 2,
+			"offset": [0, -5],
+			"targets": [1, 2, 0],
+			"waypoints": [[-3, 8]]
+		}
+	},
+	"Exits": {
+		"0": {
+			"position": [-18, 3],
+			"orientation": 180,
+			"speed limit": 2,
+			"waypoints": [[-6, 3]]
+		},
+		"1": {
+			"position": [-3, -18],
+			"orientation": -90,
+			"speed limit": 2,
+			"waypoints": [[-3, -6]]
+		},
+		"2": {
+			"position": [18, -3],
+			"orientation": 0,
+			"speed limit": 2,
+			"waypoints": [[6, -3]]
+		},
+		"3": {
+			"position": [3, 18],
+			"orientation": 90,
+			"speed limit": 2,
+			"waypoints": [[3, 6]]
+		}
+	}
+	}
+}

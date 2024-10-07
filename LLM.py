@@ -76,7 +76,7 @@ class LLM:
         if why['next_task']:
             motivation = """You have to replan because the task '""" + self.TP['tasks'][self.task_status-1] + """' is finished. In the next the description of the actual situation.
         """
-        elif why['SF_kicks_in'] or why['other_agent_too_near'] or  why['MPC_LLM_not_solved'] or why['SF_not_solved'] or why['soft_SF_kicks_in'] or why['soft_SF_psi_not_solved'] or why['soft_SF_not_solved']:
+        elif why['SF_kicks_in'] or why['other_agent_too_near'] or  why['MPC_LLM_not_solved'] or why['SF_not_solved'] or why['soft_SF_kicks_in'] or why['soft_SF_not_solved']:
             motivation = """The execution of the task '""" + self.TP['tasks'][self.task_status] + """' is not completed, but you have to replan to ensure that the task can be continued. In the next the description of the actual situation.
         """
 
@@ -113,6 +113,8 @@ class LLM:
             motivation = """Replan because MPC LLM no success with solver. Task: """
         elif why['SF_not_solved']:
             motivation = """Replan because SF no success with solver. Task: """
+        elif why['soft_SF_kicks_in']:
+            motivation = """Replan because slack variables of soft SF are larger then 1. Task: """
 
         self.final_messages.append({'User': motivation + query,
                                     'time': t})
@@ -585,7 +587,7 @@ Description of the actual situation:
 
         chat_completion = client.chat.completions.create(
             messages=message,
-            model="gpt-3.5-turbo-0125f",  # gpt-4-turbo, gpt-3.5-turbo-0125, gpt-4o
+            model="gpt-4o",  # gpt-4-turbo, gpt-3.5-turbo-0125, gpt-4o
             response_format={"type": "text"},
         )
 

@@ -201,7 +201,7 @@ def prep_plot_vehicles(results, env, t_start, ax):
                     L, W, angle=angle, rotation_point='center', facecolor=color, label=str(id_agent))
                 labels[f'{id_agent}'] = ax.text(results[f'agent {id_agent}']['x coord'][t_start],
                                                 results[f'agent {id_agent}']['y coord'][t_start], f'{id_agent}',
-                                                ha='center', va='center', color='white')
+                                                ha='center', va='center', color='black')
             else:
                 if env['With LLM car']:
                     vehicles[f'{id_agent}'] = patches.Rectangle(
@@ -218,15 +218,46 @@ def prep_plot_vehicles(results, env, t_start, ax):
                         L, W, angle=angle, rotation_point='center', facecolor=color, label=str(id_agent))
                     labels[f'{id_agent}'] = ax.text(results[f'agent {id_agent}']['x coord'][t_start],
                                                     results[f'agent {id_agent}']['y coord'][t_start], f'{id_agent}',
-                                                    ha='center', va='center', color='white')
+                                                    ha='center', va='center', color='black')
             ax.add_patch(vehicles[f'{id_agent}'])
 
             shift = np.array([[np.cos(results[f'agent {id_agent}']['theta'][t_start]) * 1.5],
                               [np.sin(results[f'agent {id_agent}']['theta'][t_start]) * 1.5]])
 
             ellipses[f'{id_agent}'] = patches.Ellipse((results[f'agent {id_agent}']['x coord'][t_start],
-                                       results[f'agent {id_agent}']['y coord'][t_start]), 8, 6, angle=angle,
+                                       results[f'agent {id_agent}']['y coord'][t_start]), 8, 8, angle=angle,
                                        edgecolor='black', linestyle='--', linewidth=1, facecolor='none')
+            ax.add_patch(ellipses[f'{id_agent}'])
+        elif results[f'agent {id_agent}']['type'] in env['Pedestrians Specification']['types']:
+            L = env['Pedestrians Specification'][results[f'agent {id_agent}']['type']]['length']
+            W = env['Pedestrians Specification'][results[f'agent {id_agent}']['type']]['width']
+            vehicles[f'{id_agent}'] = patches.Rectangle(
+                (results[f'agent {id_agent}']['x coord'][t_start] - L / 2,
+                 results[f'agent {id_agent}']['y coord'][t_start] - W / 2),
+                L, W, angle=0, facecolor='magenta', label=str(id_agent))
+            labels[f'{id_agent}'] = ax.text(results[f'agent {id_agent}']['x coord'][t_start],
+                                            results[f'agent {id_agent}']['y coord'][t_start], f'{id_agent}',
+                                            ha='center', va='center', color='black')
+            ax.add_patch(vehicles[f'{id_agent}'])
+            ellipses[f'{id_agent}'] = patches.Ellipse((results[f'agent {id_agent}']['x coord'][t_start],
+                                                       results[f'agent {id_agent}']['y coord'][t_start]), 6, 6,
+                                                      edgecolor='black', linestyle='--', linewidth=1, facecolor='none')
+            ax.add_patch(ellipses[f'{id_agent}'])
+        elif results[f'agent {id_agent}']['type'] in env['Bicycle Specification']['types']:
+            L = env['Bicycle Specification'][results[f'agent {id_agent}']['type']]['length']
+            W = env['Bicycle Specification'][results[f'agent {id_agent}']['type']]['width']
+            angle = results[f'agent {id_agent}']['theta'][t_start] * 180 / np.pi
+            vehicles[f'{id_agent}'] = patches.Rectangle(
+                (results[f'agent {id_agent}']['x coord'][t_start] - L / 2,
+                 results[f'agent {id_agent}']['y coord'][t_start] - W / 2),
+                L, W, angle=angle, rotation_point='center', facecolor='yellow', label=str(id_agent))
+            labels[f'{id_agent}'] = ax.text(results[f'agent {id_agent}']['x coord'][t_start],
+                                            results[f'agent {id_agent}']['y coord'][t_start], f'{id_agent}',
+                                            ha='center', va='center', color='black')
+            ax.add_patch(vehicles[f'{id_agent}'])
+            ellipses[f'{id_agent}'] = patches.Ellipse((results[f'agent {id_agent}']['x coord'][t_start],
+                                                       results[f'agent {id_agent}']['y coord'][t_start]), 6, 6,
+                                                      edgecolor='black', linestyle='--', linewidth=1, facecolor='none')
             ax.add_patch(ellipses[f'{id_agent}'])
 
     lines = {}
@@ -241,9 +272,11 @@ def prep_plot_vehicles(results, env, t_start, ax):
             lines[f'line{k} traj estimation'] = \
                 ax.plot(results[f'agent {k}']['trajectory estimation x'][t_start],
                         results[f'agent {k}']['trajectory estimation y'][t_start], c="green", linestyle='-')[0]  # label=f'v0 = {v02} m/s'
-        lines[f'line{k}'] = \
-            ax.plot(results[f'agent {k}']['x coord pred'][t_start], results[f'agent {k}']['y coord pred'][t_start],
-                    c="red", linestyle='-')[0]  # label=f'v0 = {v02} m/s'
+        if results[f'agent {k}']['type'] in env['Vehicle Specification']['types']:
+            lines[f'line{k}'] = \
+                ax.plot(results[f'agent {k}']['x coord pred'][t_start],
+                        results[f'agent {k}']['y coord pred'][t_start],
+                        c="red", linestyle='-')[0]  # label=f'v0 = {v02} m/s'
 
     return vehicles, labels, lines, ellipses, ax
 
@@ -253,38 +286,88 @@ def plot_vehicles(results, fig, ax, env, t_start, t_end):
     def update(frame):
 
         for id_agent in vehicles:
-            # Rectangle
-            x = results[f'agent {id_agent}']['x coord'][t_start+frame] - \
-                env['Vehicle Specification'][results[f'agent {id_agent}']['type']]['length'] / 2
-            y = results[f'agent {id_agent}']['y coord'][t_start+frame] - \
-                env['Vehicle Specification'][results[f'agent {id_agent}']['type']]['width'] / 2
-            angle = results[f'agent {id_agent}']['theta'][t_start+frame] * 180 / np.pi
-            data = np.stack([x, y]).T
-            vehicles[f'{id_agent}'].set_xy(data)
-            vehicles[f'{id_agent}'].set_angle(angle)
-            #Labels of Rectangle
-            data = np.stack(
-                [results[f'agent {id_agent}']['x coord'][t_start+frame], results[f'agent {id_agent}']['y coord'][t_start+frame]]).T
-            labels[f'{id_agent}'].set_position(data)
-            #Trajectories predicted
-            if env['With LLM car'] and id_agent == str(len(results) - 1):
-                lines[f'line{id_agent} SF'].set_xdata(results[f'agent {id_agent}']['x coord pred SF'][t_start+frame])
-                lines[f'line{id_agent} SF'].set_ydata(results[f'agent {id_agent}']['y coord pred SF'][t_start+frame])
-            else:
+            if results[f'agent {id_agent}']['type'] in env['Vehicle Specification']['types']:
+                # Rectangle
+                x = results[f'agent {id_agent}']['x coord'][t_start+frame] - \
+                    env['Vehicle Specification'][results[f'agent {id_agent}']['type']]['length'] / 2
+                y = results[f'agent {id_agent}']['y coord'][t_start+frame] - \
+                    env['Vehicle Specification'][results[f'agent {id_agent}']['type']]['width'] / 2
+                angle = results[f'agent {id_agent}']['theta'][t_start+frame] * 180 / np.pi
+                data = np.stack([x, y]).T
+                vehicles[f'{id_agent}'].set_xy(data)
+                vehicles[f'{id_agent}'].set_angle(angle)
+                #Labels of Rectangle
+                data = np.stack(
+                    [results[f'agent {id_agent}']['x coord'][t_start+frame], results[f'agent {id_agent}']['y coord'][t_start+frame]]).T
+                labels[f'{id_agent}'].set_position(data)
+                #Trajectories predicted
+                if env['With LLM car'] and id_agent == str(len(results) - 1):
+                    lines[f'line{id_agent} SF'].set_xdata(results[f'agent {id_agent}']['x coord pred SF'][t_start+frame])
+                    lines[f'line{id_agent} SF'].set_ydata(results[f'agent {id_agent}']['y coord pred SF'][t_start+frame])
+                else:
+                    lines[f'line{id_agent} traj estimation'].set_xdata(
+                        results[f'agent {id_agent}']['trajectory estimation x'][t_start+frame])
+                    lines[f'line{id_agent} traj estimation'].set_ydata(
+                        results[f'agent {id_agent}']['trajectory estimation y'][t_start+frame])
+                lines[f'line{id_agent}'].set_xdata(results[f'agent {id_agent}']['x coord pred'][t_start+frame])
+                lines[f'line{id_agent}'].set_ydata(results[f'agent {id_agent}']['y coord pred'][t_start+frame])
+                #Security areas -> ellipsoid
+                shift = np.array([[np.cos(results[f'agent {id_agent}']['theta'][t_start + frame]) * 1.5],
+                                  [np.sin(results[f'agent {id_agent}']['theta'][t_start + frame]) * 1.5]])
+                x = results[f'agent {id_agent}']['x coord'][t_start + frame]
+                y = results[f'agent {id_agent}']['y coord'][t_start + frame]
+                angle = results[f'agent {id_agent}']['theta'][t_start + frame] * 180 / np.pi
+                ellipses[f'{id_agent}'].center = (x, y)
+                ellipses[f'{id_agent}'].angle = angle
+
+            elif results[f'agent {id_agent}']['type'] in env['Pedestrians Specification']['types']:
+                # Rectangle
+                x = results[f'agent {id_agent}']['x coord'][t_start + frame] - \
+                    env['Pedestrians Specification'][results[f'agent {id_agent}']['type']]['length'] / 2
+                y = results[f'agent {id_agent}']['y coord'][t_start + frame] - \
+                    env['Pedestrians Specification'][results[f'agent {id_agent}']['type']]['width'] / 2
+                data = np.stack([x, y]).T
+                vehicles[f'{id_agent}'].set_xy(data)
+                data = np.stack(
+                    [results[f'agent {id_agent}']['x coord'][t_start + frame],
+                     results[f'agent {id_agent}']['y coord'][t_start + frame]]).T
+                labels[f'{id_agent}'].set_position(data)
+                lines[f'line{id_agent} traj estimation'].set_xdata(
+                    results[f'agent {id_agent}']['trajectory estimation x'][t_start + frame])
+                lines[f'line{id_agent} traj estimation'].set_ydata(
+                    results[f'agent {id_agent}']['trajectory estimation y'][t_start + frame])
+                x = results[f'agent {id_agent}']['x coord'][t_start + frame]
+                y = results[f'agent {id_agent}']['y coord'][t_start + frame]
+                ellipses[f'{id_agent}'].center = (x, y)
+            elif results[f'agent {id_agent}']['type'] in env['Bicycle Specification']['types']:
+                # Rectangle
+                x = results[f'agent {id_agent}']['x coord'][t_start+frame] - \
+                    env['Bicycle Specification'][results[f'agent {id_agent}']['type']]['length'] / 2
+                y = results[f'agent {id_agent}']['y coord'][t_start+frame] - \
+                    env['Bicycle Specification'][results[f'agent {id_agent}']['type']]['width'] / 2
+                angle = results[f'agent {id_agent}']['theta'][t_start+frame] * 180 / np.pi
+                data = np.stack([x, y]).T
+                vehicles[f'{id_agent}'].set_xy(data)
+                vehicles[f'{id_agent}'].set_angle(angle)
+                #Labels of Rectangle
+                data = np.stack(
+                    [results[f'agent {id_agent}']['x coord'][t_start+frame], results[f'agent {id_agent}']['y coord'][t_start+frame]]).T
+                labels[f'{id_agent}'].set_position(data)
+                #Trajectories predicted
                 lines[f'line{id_agent} traj estimation'].set_xdata(
                     results[f'agent {id_agent}']['trajectory estimation x'][t_start+frame])
                 lines[f'line{id_agent} traj estimation'].set_ydata(
                     results[f'agent {id_agent}']['trajectory estimation y'][t_start+frame])
-            lines[f'line{id_agent}'].set_xdata(results[f'agent {id_agent}']['x coord pred'][t_start+frame])
-            lines[f'line{id_agent}'].set_ydata(results[f'agent {id_agent}']['y coord pred'][t_start+frame])
-            #Security areas -> ellipsoid
-            shift = np.array([[np.cos(results[f'agent {id_agent}']['theta'][t_start + frame]) * 1.5],
-                              [np.sin(results[f'agent {id_agent}']['theta'][t_start + frame]) * 1.5]])
-            x = results[f'agent {id_agent}']['x coord'][t_start + frame]
-            y = results[f'agent {id_agent}']['y coord'][t_start + frame]
-            angle = results[f'agent {id_agent}']['theta'][t_start + frame] * 180 / np.pi
-            ellipses[f'{id_agent}'].center = (x, y)
-            ellipses[f'{id_agent}'].angle = angle
+                #lines[f'line{id_agent}'].set_xdata(results[f'agent {id_agent}']['x coord pred'][t_start+frame])
+                #lines[f'line{id_agent}'].set_ydata(results[f'agent {id_agent}']['y coord pred'][t_start+frame])
+                #Security areas -> ellipsoid
+                shift = np.array([[np.cos(results[f'agent {id_agent}']['theta'][t_start + frame]) * 1.5],
+                                  [np.sin(results[f'agent {id_agent}']['theta'][t_start + frame]) * 1.5]])
+                x = results[f'agent {id_agent}']['x coord'][t_start + frame]
+                y = results[f'agent {id_agent}']['y coord'][t_start + frame]
+                angle = results[f'agent {id_agent}']['theta'][t_start + frame] * 180 / np.pi
+                ellipses[f'{id_agent}'].center = (x, y)
+                ellipses[f'{id_agent}'].angle = angle
 
         return (vehicles, labels, lines, ellipses)
 
@@ -299,7 +382,7 @@ def plot_simulation(env_type, env, results, t_start, t_end):
 
     fig, ax = plt.subplots()
 
-    if env_type == 0:
+    if env_type == 0 or env_type == 6:
         ani, ax, fig = plot_simulation_env_0(env, results, t_start, t_end, fig, ax)
     elif env_type == 1:
         ani, ax, fig = plot_simulation_env_1(env, results, t_start, t_end, fig, ax)
@@ -509,10 +592,10 @@ def plot_simulation_env_4(env, results, t_start, t_end, fig, ax):
     plt.plot([0, 0], [-30, -6], color='black', linestyle='--')
     plt.plot([0, 0], [30, 6], color='black', linestyle='--')
 
-    for id in env['Entrances']:
+    """for id in env['Entrances']:
         plt.scatter(env['Entrances'][id]['position'][0], env['Entrances'][id]['position'][1], color='magenta')
     for id in env['Exits']:
-        plt.scatter(env['Exits'][id]['position'][0], env['Exits'][id]['position'][1], color='blue')
+        plt.scatter(env['Exits'][id]['position'][0], env['Exits'][id]['position'][1], color='blue')"""
 
     if t_start != None:
         ani = plot_vehicles(results, fig, ax, env, t_start, t_end)
