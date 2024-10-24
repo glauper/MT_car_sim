@@ -1,6 +1,7 @@
 import numpy as np
 import casadi as ca
 import random
+import time
 
 class Vehicle:
     def __init__(self, type, info_vehicle, delta_t):
@@ -464,13 +465,12 @@ class Vehicle:
             input = sol.value(U)[:, 0].reshape((self.m, 1))
 
         else:
-
             input = np.zeros((self.m, 1))
-
-            if self.acc_limits[0] > 0 - self.velocity:
-                input[0,:] = self.acc_limits[1]
-            else:
-                input[0, :] = self.velocity/2 - self.velocity
+            input[0, :] = self.velocity / 2 - self.velocity
+            if self.acc_limits[0] > input[0, :]:
+                input[0, :] = self.acc_limits[0]
+            elif self.acc_limits[1] < input[0, :]:
+                input[0, :] = self.acc_limits[1]
             input[1, :] = 0
             print('Other agents MPC solver failed. Use a default u = ', input)
 
@@ -552,14 +552,25 @@ class Vehicle:
             opti.set_initial(X, self.traj_estimation)
             opti.set_initial(U, np.zeros((self.m, self.N)))
         else:
-            opti.set_initial(X, self.previous_opt_sol_SF['X'])
-            opti.set_initial(U, self.previous_opt_sol_SF['U'])
+            #opti.set_initial(X, self.previous_opt_sol_SF['X'])
+            #opti.set_initial(U, self.previous_opt_sol_SF['U'])
+            self.trajecotry_estimation()
+            opti.set_initial(X, self.traj_estimation)
+            opti.set_initial(U, np.zeros((self.m, self.N)))
 
         try:
             opti.solver('ipopt')
             sol = opti.solve()
         except Exception as e:
             print(f"Optimization failed: {e}")
+            """try:
+                self.trajecotry_estimation()
+                opti.set_initial(X, self.traj_estimation)
+                opti.set_initial(U, np.zeros((self.m, self.N)))
+                opti.solver('ipopt')
+                sol = opti.solve()
+            except Exception as e:
+                print(f"Optimization failed: {e}")"""
 
         if opti.stats()['success']:
             self.previous_opt_sol['X'] = sol.value(X)
@@ -572,10 +583,11 @@ class Vehicle:
             if not self.SF_active:
                 # Brake
                 input = np.zeros((self.m, 1))
-                if self.acc_limits[0] > 0 - self.velocity:
+                input[0, :] = (0 - self.velocity)
+                if self.acc_limits[0] > input[0, :]:
+                    input[0, :] = self.acc_limits[0]
+                elif self.acc_limits[1] < input[0, :]:
                     input[0, :] = self.acc_limits[1]
-                else:
-                    input[0, :] = 0 - self.velocity
                 input[1, :] = 0
             else:
                 # Previous solution
@@ -665,8 +677,11 @@ class Vehicle:
             opti.set_initial(U, np.zeros((self.m, self.N)))
             #opti.set_initial(psi_b_x, np.zeros((np.size(self.b_x), self.N_SF + 1)))
         else:
-            opti.set_initial(X, self.previous_opt_sol_SF['X'])
-            opti.set_initial(U, self.previous_opt_sol_SF['U'])
+            self.trajecotry_estimation()
+            opti.set_initial(X, self.traj_estimation)
+            opti.set_initial(U, np.zeros((self.m, self.N)))
+            #opti.set_initial(X, self.previous_opt_sol_SF['X'])
+            #opti.set_initial(U, self.previous_opt_sol_SF['U'])
             #opti.set_initial(psi_b_x, self.previous_opt_sol_SF['psi_b_x'])
         try:
             opti.solver('ipopt')
@@ -712,12 +727,12 @@ class Vehicle:
         for i in range(nr_ineq_const):
             const = ineq_constraints[i] + """+ epsilon[count]"""
             opti.subject_to(eval(const) <= 0)
-            obj += epsilon[count] ** 2
+            obj += 10 * epsilon[count] ** 2
             count += 1
         for i in range(nr_eq_const):
             const = eq_constraints[i] + """+ epsilon[count]"""
             opti.subject_to(eval(const)== 0)
-            obj += epsilon[count] ** 2
+            obj += 10 * epsilon[count] ** 2
             count += 1
 
         return obj, opti
@@ -830,6 +845,9 @@ class Vehicle:
 
     def soft_SF(self, u_lernt, agents, circular_obstacles, t, info):
 
+        if self.state[3] == 0:
+            self.state[3] = 0.001
+
         opti = ca.Opti()
 
         X = opti.variable(self.n, self.N_SF + 1)
@@ -837,13 +855,17 @@ class Vehicle:
         x_s = opti.variable(self.n, 1)
         u_s = opti.variable(self.m, 1)
         psi_b_x = opti.variable(np.size(self.b_x), self.N_SF + 1)
-        weight_psi_b_x = 1
+        weight_psi_b_x = 10
+        psi_b_x_s = opti.variable(np.size(self.b_x), 1)
+        weight_psi_b_x_s = 10
         psi_v_limit = opti.variable(1, self.N_SF + 1)
-        weight_psi_v_limit = 100
+        weight_psi_v_limit = 10
         psi_agents = opti.variable(len(agents), self.N_SF + 1)
         weight_psi_agents = 100
         psi_obst = opti.variable(len(circular_obstacles), self.N_SF + 1)
-        weight_psi_obst = 1
+        weight_psi_obst = 10
+        weight_input = 1
+        weight_final_state = 1
 
         cost = 0
         for k in range(self.N_SF):
@@ -853,10 +875,10 @@ class Vehicle:
                      weight_psi_v_limit * psi_v_limit[:, k].T @ psi_v_limit[:, k])
 
             # State and Input constraints
-            opti.subject_to(self.A_x @ X[:, k + 1] <= self.b_x + psi_b_x[:, k])
+            opti.subject_to(self.A_x @ X[:, k + 1] <= self.b_x + psi_b_x[:, k + 1])
             opti.subject_to(self.A_u @ U[:, k] <= self.b_u)
 
-            opti.subject_to(X[3, k + 1] <= info['street speed limit'] + psi_v_limit[:, k])
+            opti.subject_to(X[3, k + 1] <= info['street speed limit'] + psi_v_limit[:, k + 1])
 
             # System dynamics constraints
             opti.subject_to(self.dynamics_constraints(X[:, k + 1], X[:, k], U[:, k]))
@@ -872,9 +894,7 @@ class Vehicle:
                     if agents[id_agent].security_dist != 0:
                         # opti.subject_to(self.agents_constraints(X[:, k], agents[id_agent]) >= 0)
                         opti.subject_to(self.agents_constraints_traj(X[:, k], agents[id_agent].traj_estimation[:, k],
-                                                                      agents[id_agent]) >= psi_agents[:, k])
-                    else:
-                        opti.subject_to(psi_agents[:, k] == 0)
+                                                                      agents[id_agent]) >= psi_agents[nr_agent, k])
 
         # Obstacle avoidance
         if len(circular_obstacles) != 0:
@@ -884,11 +904,11 @@ class Vehicle:
                     circular_obstacles[id_obst]['r_x']) ** 2
                     diff_y = (X[1, k] - circular_obstacles[id_obst]['center'][1]) ** 2 / (
                     circular_obstacles[id_obst]['r_y']) ** 2
-                    opti.subject_to(diff_x + diff_y >= 1 + psi_obst[:, k])
+                    opti.subject_to(diff_x + diff_y >= 1 + psi_obst[nr_obs, k])
 
-        opti.subject_to(X[3, -1] <= info['street speed limit'] + psi_v_limit[:, -1])
+        #opti.subject_to(X[3, -1] <= info['street speed limit'] + psi_v_limit[:, -1])
         # Constraint for the steady state
-        opti.subject_to(self.A_x @ x_s <= self.b_x + psi_b_x[:, -1])
+        opti.subject_to(self.A_x @ x_s <= self.b_x + psi_b_x_s)
         opti.subject_to(self.A_u @ u_s <= self.b_u)
         opti.subject_to(self.dynamics_constraints(x_s, x_s, u_s))
         # Terminal constraints
@@ -897,9 +917,11 @@ class Vehicle:
         cost += (weight_psi_b_x * psi_b_x[:, -1].T @ psi_b_x[:, -1] +
                  weight_psi_agents * psi_agents[:, -1].T @ psi_agents[:, -1] +
                  weight_psi_obst * psi_obst[:, -1].T @ psi_obst[:, -1] +
-                 weight_psi_v_limit * psi_v_limit[:, -1].T @ psi_v_limit[:, -1])
+                 weight_psi_v_limit * psi_v_limit[:, -1].T @ psi_v_limit[:, -1] +
+                 weight_psi_b_x_s * psi_b_x_s.T @ psi_b_x_s)
 
-        cost += ca.norm_2(u_lernt - U[:, 0]) ** 2
+        cost += (weight_input * ca.norm_2(u_lernt - U[:, 0]) ** 2 +
+                 weight_final_state * ca.norm_2(self.previous_opt_sol['X'][:, -1] - X[:, -1]) ** 2)
 
         opti.minimize(cost)
 
@@ -916,7 +938,6 @@ class Vehicle:
             opti.set_initial(psi_obst, np.zeros((len(circular_obstacles), self.N_SF + 1)))
 
         else:
-            print('Time: ', t)
             opti.set_initial(X, self.previous_opt_sol_SF['X'])
             opti.set_initial(U, self.previous_opt_sol_SF['U'])
             try:
@@ -926,6 +947,7 @@ class Vehicle:
                 opti.set_initial(psi_v_limit, self.previous_opt_sol_SF['psi_v_limit'])
                 opti.set_initial(psi_agents, self.previous_opt_sol_SF['psi_agents'])
                 opti.set_initial(psi_obst, self.previous_opt_sol_SF['psi_obst'])
+                opti.set_initial(psi_b_x_s, self.previous_opt_sol_SF['psi_b_x_s'])
             except Exception as e:
                 self.trajecotry_estimation()
                 opti.set_initial(x_s, self.traj_estimation[:, -1])
@@ -950,6 +972,7 @@ class Vehicle:
             self.previous_opt_sol_SF['psi_v_limit'] = sol.value(psi_v_limit)
             self.previous_opt_sol_SF['psi_agents'] = sol.value(psi_agents)
             self.previous_opt_sol_SF['psi_obst'] = sol.value(psi_obst)
+            self.previous_opt_sol_SF['psi_b_x_s'] = sol.value(psi_b_x_s)
             self.previous_opt_sol_SF['Cost'] = np.linalg.norm(u_lernt - sol.value(U)[:, 0]) ** 2
 
             input = sol.value(U)[:, 0].reshape((self.m, 1))
@@ -957,13 +980,14 @@ class Vehicle:
 
         else:
             input = np.zeros((self.m, 1))
-            if self.acc_limits[0] > (0 - self.velocity) / self.delta_t:
+            input[0, :] = (0 - self.velocity) / self.delta_t
+            if self.acc_limits[0] > input[0, :]:
+                input[0, :] = self.acc_limits[0]
+            elif self.acc_limits[1] < input[0, :]:
                 input[0, :] = self.acc_limits[1]
-            else:
-                input[0, :] = (0 - self.velocity) / self.delta_t
             input[1, :] = 0
 
-            print('SF solver failed. Use a default input u = ', input)
+            print('soft SF solver failed!')
             self.success_solver_SF = False
 
         return input
@@ -1099,10 +1123,11 @@ class Vehicle:
         else:
 
             input = np.zeros((self.m, 1))
-            if self.acc_limits[0] > 0 - self.velocity:
+            input[0, :] = (0 - self.velocity) / self.delta_t
+            if self.acc_limits[0] > input[0, :]:
+                input[0, :] = self.acc_limits[0]
+            elif self.acc_limits[1] < input[0, :]:
                 input[0, :] = self.acc_limits[1]
-            else:
-                input[0, :] = 0 - self.velocity
             input[1, :] = 0
 
             print('SF solver failed. Use a default input u = ', input)

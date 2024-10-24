@@ -21,7 +21,6 @@ counter = {'crash': 0,
            'fail solver SF': 0,
            'fail solver soft SF': 0,
            'slack SF': []}
-
 type_simulation = "safe_narrate"
 (SimulationParam, env, agents, ego_vehicle, Language_Module, presence_emergency_car, order_optimization, priority,
  results, circular_obstacles, counter) = sim_init(counter, type_simulation)
@@ -84,9 +83,10 @@ while run_simulation:
             other_agents[name_vehicle] = agents[name_vehicle]
             if SimulationParam['With LLM car']:
                 # Here if a vehicle is more near then the security distance from the LLM car, the LLM car will brake and replan
-                """if check_proximity(ego_vehicle, agents[name_vehicle]):
+                if check_proximity(ego_vehicle, agents[name_vehicle]):
                     counter['too_near'] += 1
-                    if 'brakes()' in Language_Module.TP['tasks'][Language_Module.task_status]:
+                    too_near = True
+                    """if 'brakes()' in Language_Module.TP['tasks'][Language_Module.task_status]:
                         too_near = False
                     else:
                         if not SimulationParam['Controller']['Ego']['SF']['Soft']:
@@ -112,16 +112,26 @@ while run_simulation:
                 if match:
                     id_agent = match.group(1)
                     if 'agent ' + id_agent in Language_Module.TP['tasks'][Language_Module.task_status]:
-                        if all(priority.A_p @ agents[id_agent].position <= priority.b_p):
-                            next_task = False
-                        else:
-                            next_task = True
-                if ego_vehicle.t_subtask > 15:
-                    next_task = True
-            elif abs(ego_vehicle.velocity) <= 0.01:
+                        if agents[id_agent].type in env['Pedestrians Specification']['types']:
+                            if agents[id_agent].inside_street():
+                                next_task = False
+                            else:
+                                next_task = True
+                        elif agents[id_agent].type in env['Vehicle Specification']['types'] or agents[id_agent].type in \
+                                env['Bicycle Specification']['types']:
+                            if all(priority.A_p @ agents[id_agent].position <= priority.b_p):
+                                next_task = False
+                            else:
+                                next_task = True
+            if ego_vehicle.t_subtask > 15:
                 next_task = True
+            #if too_near:
+            #    next_task = False
+            #    if ego_vehicle.t_subtask > 50:
+            #        next_task = True
         elif 'wait' in Language_Module.TP['tasks'][Language_Module.task_status]:
             ego_brake = True
+            # This such because when it brakes does not call all the time TP base on the old SF cost
             ego_vehicle.previous_opt_sol_SF['Cost'] = 0
             ego_vehicle.previous_opt_sol['Cost'] = 0
             ego_vehicle.success_solver_MPC_LLM = True
@@ -132,19 +142,30 @@ while run_simulation:
             if match:
                 id_agent = match.group(1)
                 if 'agent ' + id_agent in Language_Module.TP['tasks'][Language_Module.task_status]:
-                    if all(priority.A_p @ agents[id_agent].position <= priority.b_p):
-                        next_task = False
-                    else:
-                        next_task = True
-            if ego_vehicle.t_subtask > 30:
+                    if agents[id_agent].type in env['Pedestrians Specification']['types']:
+                        if agents[id_agent].inside_street():
+                            next_task = False
+                        else:
+                            next_task = True
+                    elif agents[id_agent].type in env['Vehicle Specification']['types'] or agents[id_agent].type in env['Bicycle Specification']['types']:
+                        if all(priority.A_p @ agents[id_agent].position <= priority.b_p):
+                            next_task = False
+                        else:
+                            next_task = True
+            if ego_vehicle.t_subtask > 15:
                 next_task = True
-        elif too_near:
-            ego_brake = True
-            Language_Module.final_messages.append({'Vehicle': 'brakes() because there is a car too near',
-                                                   'time': t})
-            ego_vehicle.previous_opt_sol_SF['Cost'] = 0
-            if abs(ego_vehicle.velocity) <= 0.01:
-                next_task = True
+            #if too_near:
+            #    next_task = False
+            #    if ego_vehicle.t_subtask > 50:
+            #        next_task = True
+        #elif too_near:
+        #    ego_brake = True
+        #    error()
+        #    Language_Module.final_messages.append({'Vehicle': 'brakes() because there is a car too near',
+        #                                           'time': t})
+        #    ego_vehicle.previous_opt_sol_SF['Cost'] = 0
+        #    if abs(ego_vehicle.velocity) <= 0.01:
+        #        next_task = True
         else:
             # Check if necessary to have new Optimization Design
             if len(Language_Module.OD) == 0:
@@ -189,7 +210,7 @@ while run_simulation:
                         Language_Module.final_messages.append({'Vehicle': 'No success for soft SF solver',
                                                                'time': t})
                         counter['fail solver soft SF'] += 1
-                        error_solver_SF_have_failed()
+                        numeric_error_solver_SF()
                 else: # Hard SF
                     input_ego = ego_vehicle.SF(input_ego, agents, circular_obstacles, t, Language_Module, info)
                     print('Cost SF ', ego_vehicle.previous_opt_sol_SF['Cost'])
@@ -240,8 +261,13 @@ while run_simulation:
     # update the velocity limit in the new street for other agents and check i there are crush
     for name_agent in agents:
         if SimulationParam['With LLM car']:
-            if check_crash(ego_vehicle, agents[name_agent]):
-                counter['crash'] += 1
+            if agents[name_agent].type in env['Vehicle Specification']['types']:
+                if agents[name_agent].entering or agents[name_agent].exiting:
+                    if check_crash(ego_vehicle, agents[name_agent]):
+                        counter['crash'] += 1
+            else:
+                if check_crash(ego_vehicle, agents[name_agent]):
+                    counter['crash'] += 1
         if agents[name_agent].type in env['Vehicle Specification']['types']:
             if agents[name_agent].entering or agents[name_agent].exiting:
                 agents[name_agent].update_velocity_limits(env)
@@ -249,7 +275,7 @@ while run_simulation:
     # Check if some flag say that a replan of TP is needed for LLM car
     if SimulationParam['With LLM car']:
         run_simulation, counter = check_need_replan(ego_vehicle, agents, Language_Module, env, SimulationParam,
-                                           run_simulation, next_task, too_near, t, counter)
+                                           run_simulation, next_task, too_near, ego_brake, t, counter)
         for name_agent in agents:
             if agents[name_agent].type == 'emergency car':
                 if agents[name_agent].exiting:
@@ -270,14 +296,14 @@ while run_simulation:
         if all(reach_end_target):
             run_simulation = False
 
-    if t == 200:
-        print('End simulation: because max simulation steps are reached.')
+    if t == 300:
+        counter['motivation'] = 'End simulation: because max simulation steps are reached.'
         run_simulation = False
     elif counter['TP calls'] >= 25:
-        print('End simulation: because LLM is called to many times.')
+        counter['motivation'] = 'End simulation: because LLM is called to many times.'
         run_simulation = False
     elif counter['crash'] >= 1:
-        print('End simulation: because LLM car crushes to another agent.')
+        counter['motivation'] = 'End simulation: because LLM car crushes to another agent.'
         run_simulation = False
 
 # Save the results
@@ -289,17 +315,20 @@ if SimulationParam['With LLM car']:
     #final_messages_path = os.path.join(os.path.dirname(__file__), ".", "prompts/output_LLM/DE_output.json")
     #with open(final_messages_path, 'w') as file:
     #    json.dump(Language_Module.DE, file)
+    if SimulationParam['Controller']['Ego']['SF']['Soft']:
+        print('Slack variables bigger then zero: ', counter['slack SF'])
+        print('How many times TP is called due to soft SF: ', len(counter['slack SF']))
+    elif SimulationParam['Controller']['Ego']['SF']['Active']:
+        print('How many times solver SF failed: ', counter['fail solver SF'])
 
     print('How many crash: ', counter['crash'])
-    print('How many invasion of security area: ', counter['too_near'])
     print('How many times TP is called: ', counter['TP calls'])
     print('How many times OD is called: ', counter['OD calls'])
+    print('How many invasion of security area: ', counter['too_near'])
     print('How many times solver MPC LLM failed: ', counter['fail solver MPC LLM'])
-    print('How many times solver SF failed: ', counter['fail solver SF'])
-    print('How many times solver soft SF failed: ', counter['fail solver soft SF'])
-    print('Slack variables bigger then zero: ', counter['slack SF'])
     counter['Mean time for LLM'] = np.mean(counter['elapsed time for LLM'])
     print('Mean elapsed time for LLM to give output: ', counter['Mean time for LLM'])
+    print('Motivation: ', counter['motivation'])
 
     path = os.path.join(os.path.dirname(__file__), ".", "save_results/counter.json")
     with open(path, 'w') as file:

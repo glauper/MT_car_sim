@@ -47,18 +47,52 @@ while run_simulation:
     too_near = False
     for name_vehicle in order_optimization:
         id_vehicle = int(name_vehicle)
-        if agents[name_vehicle].entering or agents[name_vehicle].exiting:
+        if agents[name_vehicle].type in env['Pedestrians Specification']['types']:
             agents[name_vehicle].trajecotry_estimation()
-            input[f'agent {id_vehicle}'] = agents[name_vehicle].trackingMPC(other_agents, ego_vehicle, circular_obstacles, t)
+            if agents[name_vehicle].type == 'adult':
+                away_flag = True
+                for other_agent in order_optimization:
+                    if other_agent != name_vehicle:
+                        if agents[other_agent].type in env['Vehicle Specification']['types']:
+                            if np.linalg.norm(agents[name_vehicle].position - agents[other_agent].position) <= 5:
+                                away_flag = False
+                if not away_flag:
+                    if not agents[name_vehicle].inside_street():
+                        input[f'agent {id_vehicle}'] = agents[name_vehicle].brakes()
+                    else:
+                        if np.linalg.norm(agents[name_vehicle].position - agents[other_agent].position) <= agents[
+                            name_vehicle].security_dist:
+                            input[f'agent {id_vehicle}'] = agents[name_vehicle].brakes()
+                        else:
+                            # input[f'agent {id_vehicle}'] = agents[name_vehicle].move()
+                            input[f'agent {id_vehicle}'] = agents[name_vehicle].trackingMPC(other_agents, ego_vehicle,
+                                                                                            circular_obstacles, t)
+                else:
+                    # input[f'agent {id_vehicle}'] = agents[name_vehicle].move()
+                    input[f'agent {id_vehicle}'] = agents[name_vehicle].trackingMPC(other_agents, ego_vehicle,
+                                                                                    circular_obstacles, t)
+            elif agents[name_vehicle].type == 'children':
+                input[f'agent {id_vehicle}'] = agents[name_vehicle].trackingMPC(other_agents, ego_vehicle,
+                                                                                circular_obstacles, t)
+                # input[f'agent {id_vehicle}'] = agents[name_vehicle].move()
+
+            other_agents[name_vehicle] = agents[name_vehicle]
+        elif agents[name_vehicle].entering or agents[name_vehicle].exiting:
+            agents[name_vehicle].trajecotry_estimation()
+            input[f'agent {id_vehicle}'] = agents[name_vehicle].trackingMPC(other_agents, ego_vehicle,
+                                                                            circular_obstacles, t)
             other_agents[name_vehicle] = agents[name_vehicle]
             if SimulationParam['With LLM car']:
-                # Here if a vehicle is more near then the security distance from the LLM car, the LLM car will brake and replan
+                # Here if a vehicle is more near than the security distance from the LLM car, the LLM car will brake and replan
                 if check_proximity(ego_vehicle, agents[name_vehicle]):
                     counter['too_near'] += 1
-                    if 'brakes' in LLM.TP['action chosen'][0]:
+                    """if 'brakes()' in Language_Module.TP['tasks'][Language_Module.task_status]:
                         too_near = False
                     else:
-                        too_near = True
+                        if not SimulationParam['Controller']['Ego']['SF']['Soft']:
+                            too_near = True
+                        else:
+                            too_near = False"""
 
     # Here all the steps for the LLM car
     if SimulationParam['With LLM car']:
@@ -68,7 +102,10 @@ while run_simulation:
             ego_brake = True
             # This such because when it brakes does not call all the time TP base on the old SF cost
             ego_vehicle.previous_opt_sol_SF['Cost'] = 0
-            if ego_vehicle.t_subtask > 30:
+            ego_vehicle.previous_opt_sol['Cost'] = 0
+            ego_vehicle.success_solver_MPC_LLM = True
+            ego_vehicle.success_solver_SF = True
+            if ego_vehicle.t_subtask > 15:
                 next_task = True
             elif abs(ego_vehicle.velocity) <= 0.01:
                 next_task = True
@@ -124,7 +161,9 @@ while run_simulation:
     else:
         # Dynamics propagation if there isn't an emergency car
         for id_vehicle, name_vehicle in enumerate(agents):
-            if agents[name_vehicle].entering or agents[name_vehicle].exiting:
+            if agents[name_vehicle].type in env['Pedestrians Specification']['types']:
+                agents[name_vehicle].dynamics_propagation(input[f'agent {id_vehicle}'])
+            elif agents[name_vehicle].entering or agents[name_vehicle].exiting:
                 agents[name_vehicle].dynamics_propagation(input[f'agent {id_vehicle}'])
             else:
                 agents[name_vehicle].brakes()
@@ -136,20 +175,26 @@ while run_simulation:
         ego_vehicle.t_subtask += 1
         # I don't think is the best way to do that...
         agents[str(len(agents))] = ego_vehicle
-        #agents = priority.SwissPriority(agents, order_optimization, SimulationParam['With LLM car'])
-        agents = priority.NoPriority(agents, order_optimization, SimulationParam['With LLM car'])
+        agents = priority.SwissPriority(agents, order_optimization, SimulationParam['With LLM car'], presence_emergency_car)
+        #agents = priority.NoPriority(agents, order_optimization, SimulationParam['With LLM car'])
         ego_vehicle = agents.pop(str(len(agents)-1))
     else:
-        #agents = priority.SwissPriority(agents, order_optimization, SimulationParam['With LLM car'])
-        agents = priority.NoPriority(agents, order_optimization, SimulationParam['With LLM car'])
+        agents = priority.SwissPriority(agents, order_optimization, SimulationParam['With LLM car'], presence_emergency_car)
+        #agents = priority.NoPriority(agents, order_optimization, SimulationParam['With LLM car'])
 
     # update the velocity limit in the new street for other agents and check i there are crush
     for name_agent in agents:
-        if agents[name_agent].entering or agents[name_agent].exiting:
-            agents[name_agent].update_velocity_limits(env)
-            if SimulationParam['With LLM car']:
+        if SimulationParam['With LLM car']:
+            if agents[name_agent].type in env['Vehicle Specification']['types']:
+                if agents[name_agent].entering or agents[name_agent].exiting:
+                    if check_crash(ego_vehicle, agents[name_agent]):
+                        counter['crash'] += 1
+            else:
                 if check_crash(ego_vehicle, agents[name_agent]):
                     counter['crash'] += 1
+        if agents[name_agent].type in env['Vehicle Specification']['types']:
+            if agents[name_agent].entering or agents[name_agent].exiting:
+                agents[name_agent].update_velocity_limits(env)
 
     # Check if some flag say that a replan of TP is needed for LLM car
     if SimulationParam['With LLM car']:
@@ -181,7 +226,7 @@ while run_simulation:
                 ego_vehicle.exiting = True
             if np.linalg.norm(ego_vehicle.position - ego_vehicle.final_target['position']) <= 1:
                 next_task = True
-                print('End simulation: because the position of LLM car is near enough to the the final target.')
+                counter['motivation'] = 'End simulation: because the position of LLM car is near enough to the the final target.'
                 run_simulation = False
 
         if run_simulation:
@@ -216,26 +261,35 @@ while run_simulation:
                 counter['elapsed time for LLM'].append(end - start)
                 counter['LLM calls'] += 1
                 ego_vehicle.success_solver_MPC_LLM = True
+
+        for name_agent in agents:
+            if agents[name_agent].type == 'emergency car':
+                if agents[name_agent].exiting:
+                    presence_emergency_car = False
     else:
         reach_end_target = []
         for name_agent in agents:
-            if agents[name_agent].entering == False and agents[name_agent].exiting == False:
+            if agents[name_agent].type in env['Pedestrians Specification']['types']:
                 reach_end_target.append(True)
             else:
-                reach_end_target.append(False)
-            if agents[name_agent].exiting and agents[name_agent].type == 'emergency_car':
-                presence_emergency_car = False
+                if agents[name_agent].entering == False and agents[name_agent].exiting == False:
+                    reach_end_target.append(True)
+                else:
+                    reach_end_target.append(False)
+                if agents[name_agent].exiting and agents[name_agent].type == 'emergency car':
+                    presence_emergency_car = False
+
         if all(reach_end_target):
             run_simulation = False
 
-    if t == 400:
-        print('End simulation: because max simulation steps are reached.')
+    if t == 300:
+        counter['motivation'] = 'End simulation: because max simulation steps are reached.'
         run_simulation = False
     elif counter['LLM calls'] >= 25:
-        print('End simulation: because LLM is called to many times.')
+        counter['motivation'] = 'End simulation: because LLM is called to many times.'
         run_simulation = False
     elif counter['crash'] >= 1:
-        print('End simulation: because LLM car crushes to another agent.')
+        counter['motivation'] = 'End simulation: because LLM car crushes to another agent.'
         run_simulation = False
 
 # Save the results
@@ -249,11 +303,12 @@ if SimulationParam['With LLM car']:
     #    json.dump(Language_Module.DE, file)
 
 print('How many crash: ', counter['crash'])
-print('How many invasion of security area: ', counter['too_near'])
 print('How many times LLM is called: ', counter['LLM calls'])
+print('How many invasion of security area: ', counter['too_near'])
 print('How many times solver MPC LLM failed: ', counter['fail solver MPC LLM'])
 counter['Mean time for LLM'] = np.mean(counter['elapsed time for LLM'])
 print('Mean elapsed time for LLM to give output: ', counter['Mean time for LLM'])
+print('Motivation: ', counter['motivation'])
 
 path = os.path.join(os.path.dirname(__file__), ".", "save_results/counter.json")
 with open(path, 'w') as file:

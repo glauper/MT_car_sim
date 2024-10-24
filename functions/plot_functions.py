@@ -240,7 +240,7 @@ def prep_plot_vehicles(results, env, t_start, ax):
                                             ha='center', va='center', color='black')
             ax.add_patch(vehicles[f'{id_agent}'])
             ellipses[f'{id_agent}'] = patches.Ellipse((results[f'agent {id_agent}']['x coord'][t_start],
-                                                       results[f'agent {id_agent}']['y coord'][t_start]), 6, 6,
+                                                       results[f'agent {id_agent}']['y coord'][t_start]), 8, 8,
                                                       edgecolor='black', linestyle='--', linewidth=1, facecolor='none')
             ax.add_patch(ellipses[f'{id_agent}'])
         elif results[f'agent {id_agent}']['type'] in env['Bicycle Specification']['types']:
@@ -256,7 +256,7 @@ def prep_plot_vehicles(results, env, t_start, ax):
                                             ha='center', va='center', color='black')
             ax.add_patch(vehicles[f'{id_agent}'])
             ellipses[f'{id_agent}'] = patches.Ellipse((results[f'agent {id_agent}']['x coord'][t_start],
-                                                       results[f'agent {id_agent}']['y coord'][t_start]), 6, 6,
+                                                       results[f'agent {id_agent}']['y coord'][t_start]), 8, 8,
                                                       edgecolor='black', linestyle='--', linewidth=1, facecolor='none')
             ax.add_patch(ellipses[f'{id_agent}'])
 

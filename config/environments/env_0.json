@@ -1,7 +1,7 @@
 {"env": {
 	"Number Vehicles": 2,
-	"Number Pedestrians": 0,
-	"Number Bicycles": 2,
+	"Number Pedestrians": 4,
+	"Number Bicycles": 0,
 	"Number Emergency Vehicles": 0,
 	"State space": {
 		"x limits": [-25, 25],
@@ -57,7 +57,7 @@
 	"Pedestrians Specification": {
 		"types": ["adult", "children"],
 		"adult": {
-			"radius": 3,
+			"radius": 4,
 			"length": 1.5,
 			"width": 1.5,
 			"security distance": 4,
@@ -67,7 +67,7 @@
 			"acceleration limits": [-1, 1]
 		},
 		"children": {
-			"radius": 2,
+			"radius": 4,
 			"length": 1,
 			"width": 1,
 			"security distance": 4,

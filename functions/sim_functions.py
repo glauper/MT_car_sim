@@ -422,7 +422,7 @@ def check_crash(ego, agent):
 
     return crash_status
 
-def check_need_replan(ego_vehicle, agents, Language_Module, env, SimulationParam, run_simulation, next_task, too_near, t, counter):
+def check_need_replan(ego_vehicle, agents, Language_Module, env, SimulationParam, run_simulation, next_task, too_near, ego_brake, t, counter):
     # check if the task is finished, i.e. when LLM car is near enough to a waypoint
     print('Cost LLM ', ego_vehicle.previous_opt_sol['Cost'])
     if 'entry' in Language_Module.TP['tasks'][Language_Module.task_status]:
@@ -451,7 +451,7 @@ def check_need_replan(ego_vehicle, agents, Language_Module, env, SimulationParam
             ego_vehicle.exiting = True
         if np.linalg.norm(ego_vehicle.position - ego_vehicle.final_target['position']) <= 1:
             next_task = True
-            print('End simulation: because the position of LLM car is near enough to the the final target.')
+            counter['motivation'] = 'End simulation: because the position of LLM car is near enough to the the final target.'
             run_simulation = False
 
     if run_simulation:
@@ -483,15 +483,15 @@ def check_need_replan(ego_vehicle, agents, Language_Module, env, SimulationParam
             end = time.time()
             counter['elapsed time for LLM'].append(end - start)
             counter['TP calls'] += 1
-        elif too_near:
-            print('Call TP: because an agent is to near')
-            ego_vehicle.t_subtask = 0
-            reason['other_agent_too_near'] = True
-            start = time.time()
-            Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
-            end = time.time()
-            counter['elapsed time for LLM'].append(end - start)
-            counter['TP calls'] += 1
+        #elif too_near:
+        #    print('Call TP: because an agent is to near')
+        #    ego_vehicle.t_subtask = 0
+        #    reason['other_agent_too_near'] = True
+        #    start = time.time()
+        #    Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
+        #    end = time.time()
+        #    counter['elapsed time for LLM'].append(end - start)
+        #    counter['TP calls'] += 1
         elif not ego_vehicle.success_solver_MPC_LLM:
             print('Call TP: because no success of MPC LLM.')
             ego_vehicle.t_subtask = 0
@@ -516,22 +516,75 @@ def check_need_replan(ego_vehicle, agents, Language_Module, env, SimulationParam
             counter['elapsed time for LLM'].append(end - start)
             counter['TP calls'] += 1
             ego_vehicle.success_solver_SF = True
-        elif SimulationParam['Controller']['Ego']['SF']['Soft']:
+        elif SimulationParam['Controller']['Ego']['SF']['Soft'] and not ego_brake:
             replan_flag = False
-            soft_SF_trashold = 1
+            slack_time_t = {}
             for k in range(ego_vehicle.N_SF + 1):
-                if np.linalg.norm(ego_vehicle.previous_opt_sol_SF['psi_b_x'][:, k]) > soft_SF_trashold:
+                # x coord limit
+                if k <= 3 and abs(ego_vehicle.previous_opt_sol_SF['psi_b_x'][0, k]) > 5:
                     replan_flag = True
-                    counter['slack SF'].append(['time ' + str(t) + ': psi_b_x k = ' + str(k), list(ego_vehicle.previous_opt_sol_SF['psi_b_x'][:, k])])
-                #elif np.linalg.norm(ego_vehicle.previous_opt_sol_SF['psi_v_limit'][k]) > soft_SF_trashold:
-                #    replan_flag = True
-                elif np.linalg.norm(ego_vehicle.previous_opt_sol_SF['psi_agents'][:, k]) > soft_SF_trashold:
+                    slack_time_t['x coord positive'] = {'k = ' + str(k):
+                                                            ego_vehicle.previous_opt_sol_SF['psi_b_x'][0, k]}
+                # x coord limit
+                if k <= 3 and abs(ego_vehicle.previous_opt_sol_SF['psi_b_x'][1, k]) > 5:
                     replan_flag = True
-                    counter['slack SF'].append(['time ' + str(t) + ': psi_agents k = ' + str(k), list(ego_vehicle.previous_opt_sol_SF['psi_agents'][:, k])])
-                elif np.linalg.norm(ego_vehicle.previous_opt_sol_SF['psi_obst'][:, k]) > soft_SF_trashold:
+                    slack_time_t['x coord negative'] = {'k = ' + str(k):
+                                                          ego_vehicle.previous_opt_sol_SF['psi_b_x'][1, k]}
+                # y coord limit
+                if k <= 3 and abs(ego_vehicle.previous_opt_sol_SF['psi_b_x'][2, k]) > 5:
                     replan_flag = True
-                    counter['slack SF'].append(['time ' + str(t) + ': psi_obst k = ' + str(k), list(ego_vehicle.previous_opt_sol_SF['psi_obst'][:, k])])
+                    slack_time_t['y coord positive'] = {'k = ' + str(k):
+                                                          ego_vehicle.previous_opt_sol_SF['psi_b_x'][2, k]}
+                # y coord limit
+                if k <= 3 and abs(ego_vehicle.previous_opt_sol_SF['psi_b_x'][3, k]) > 5:
+                    replan_flag = True
+                    slack_time_t['y coord negative'] = {'k = ' + str(k):
+                                                          ego_vehicle.previous_opt_sol_SF['psi_b_x'][3, k]}
+                # theta coord limit
+                if k <= 3 and abs(ego_vehicle.previous_opt_sol_SF['psi_b_x'][4, k]) > np.pi:
+                    replan_flag = True
+                    slack_time_t['theta positive'] = {'k = ' + str(k):
+                                                          ego_vehicle.previous_opt_sol_SF['psi_b_x'][4, k]}
+                # theta coord limit
+                if k <= 3 and abs(ego_vehicle.previous_opt_sol_SF['psi_b_x'][5, k]) > np.pi:
+                    replan_flag = True
+                    slack_time_t['theta negative'] = {'k = ' + str(k):
+                                                          ego_vehicle.previous_opt_sol_SF['psi_b_x'][5, k]}
+                # velocity coord limit
+                if k <= 3 and abs(ego_vehicle.previous_opt_sol_SF['psi_b_x'][6, k]) > 1.4:
+                    replan_flag = True
+                    slack_time_t['velocity positive'] = {'k = ' + str(k):
+                                                          ego_vehicle.previous_opt_sol_SF['psi_b_x'][6, k]}
+                # velocity coord limit
+                if k <= 3 and abs(ego_vehicle.previous_opt_sol_SF['psi_b_x'][7, k]) > 1.4:
+                    replan_flag = True
+                    slack_time_t['velocity negative'] = {'k = ' + str(k):
+                                                          ego_vehicle.previous_opt_sol_SF['psi_b_x'][7, k]}
+                # velocity limit of the road
+                if k <= 3 and ego_vehicle.previous_opt_sol_SF['psi_v_limit'][k] > 1.4:
+                    replan_flag = True
+                    slack_time_t['velocity limit'] = {'k = ' + str(k):
+                                                          ego_vehicle.previous_opt_sol_SF['psi_v_limit'][k]}
+                # constraint to agents
+                for id_agent in range(np.size(ego_vehicle.previous_opt_sol_SF['psi_agents'][:, k])):
+                    if k <= 5 and abs(ego_vehicle.previous_opt_sol_SF['psi_agents'][id_agent, k]) > 0.001:
+                        replan_flag = True
+                        slack_time_t['agent ' + str(id_agent) + ' const'] = {'k = ' + str(k):
+                                                           ego_vehicle.previous_opt_sol_SF['psi_agents'][id_agent, k]}
+                    if k <= 10 and np.linalg.norm(ego_vehicle.previous_opt_sol_SF['X'][0:2, k] - agents[str(id_agent)].position) <= 4:
+                        replan_flag = True
+                        slack_time_t['ego safe traj in agent ' + str(id_agent) + ' safe zone'] = {'k = ' + str(k): np.linalg.norm(ego_vehicle.previous_opt_sol_SF['X'][0:2, k] - agents[str(id_agent)].position)}
+                # constraint to obstacles
+                for id_obst in range(np.size(ego_vehicle.previous_opt_sol_SF['psi_obst'][:, k])):
+                    if k <= 6 and abs(ego_vehicle.previous_opt_sol_SF['psi_obst'][id_obst, k]) > 0.1:
+                        replan_flag = True
+                        slack_time_t['obst ' + str(id_obst) + ' const'] = {'k = ' + str(k):
+                                                         ego_vehicle.previous_opt_sol_SF['psi_obst'][id_obst, k]}
+                if np.linalg.norm(ego_vehicle.previous_opt_sol_SF['X'][0:2, -1] - ego_vehicle.previous_opt_sol['X'][0:2, -1]) > 6:
+                    replan_flag = True
+                    slack_time_t['X_safe and X_LLM diverges'] = np.linalg.norm(ego_vehicle.previous_opt_sol_SF['X'][0:2, -1] - ego_vehicle.previous_opt_sol['X'][0:2, -1])
             if replan_flag == True:
+                counter['slack SF'].append({'Time '+ str(t): slack_time_t})
                 print('Call TP: because the slack variable of soft SF are higher then treshold.')
                 ego_vehicle.t_subtask = 0
                 reason['soft_SF_kicks_in'] = True

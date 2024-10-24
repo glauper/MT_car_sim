@@ -24,11 +24,7 @@ Rules:
     (9) If you are coming to the cross and there is an other car, which is going to his exit, you MUST choose to move to your exit only if you will not interfere with his trajectory. 
     (10) If a car is going to his exit before you, try to understand from previous descriptions if this car is going to his exit before you because it have priority over you. In this case you should wait that this car pass.
     (11) If an agent is less then 4m away from you, you MUST brakes() and wait that this agent to pass as first task.
-    (12) If an agent is an adult pay attention, they have the ABSOLUT priority, but normally they are more attentive to the the traffic.
-    (13) If an agent is an children pay REALLY attention, they have the ABSOLUT priority and normally they are NOT attentive to the the traffic.
-    (14) If an agent is bicycle pay attention, they move with you on the road and should respect the priorities.
-    (15) It is possible that an emergency car come in the cross. If the emergency car has the sirens on, it HAS the priority.
-
+    
 The description of the situation will give you this list of information about the other agents:
     (1) The type of agent (vehicle, pedestrian, bicycle,...)
     (2) From which entrance of the cross it is coming, to which exit of the cross it is going or if is going away from the cross
@@ -970,7 +966,7 @@ Rules:
     (5) If an agent is leaving the cross, it should not be considered for the priorities.
     (6) If you are coming to the cross and there is an other car, which is going to his exit, you MUST choose to move to your exit only if you will not interfere with his trajectory. 
     (7) If a car is going to his exit before you, try to understand from previous descriptions if this car is going to his exit before you because it have priority over you. In this case you should wait that this car pass.
-    (8) If an agent is less then 3m away from you, you MUST brakes and wait that this agent to pass as first task.
+    (8) If an agent is less then 4m away from you, you MUST brakes and wait that this agent to pass as first task.
         
 The description of the situation will give you this list of information about the other agents:
     (1) The type of vehicle
@@ -1071,57 +1067,91 @@ There are other """ + str(len(agents)) + """ agents moving in the region of the 
         """
 
     for i, id_agent in enumerate(agents):
-        diff_angle = (ego.theta - agents[id_agent].theta) * 180 / np.pi
+
+        if agents[id_agent].type in env['Pedestrians Specification']['types']:
+            if abs(agents[id_agent].v_x) <= 0.01:
+                if agents[id_agent].v_y < 0:
+                    diff_angle = (ego.theta - (-np.pi / 2)) * 180 / np.pi
+                elif agents[id_agent].v_y > 0:
+                    diff_angle = (ego.theta - (np.pi / 2)) * 180 / np.pi
+            elif abs(agents[id_agent].v_y) <= 0.01:
+                if agents[id_agent].v_x < 0:
+                    diff_angle = (ego.theta - (np.pi)) * 180 / np.pi
+                elif agents[id_agent].v_x > 0:
+                    diff_angle = (ego.theta - 0) * 180 / np.pi
+        elif agents[id_agent].type in env['Vehicle Specification']['types']:
+            diff_angle = (ego.theta - agents[id_agent].theta) * 180 / np.pi
+        elif agents[id_agent].type in env['Bicycle Specification']['types']:
+            diff_angle = (ego.theta - agents[id_agent].theta) * 180 / np.pi
+
         if diff_angle < 0:
             dir = str(round(abs(diff_angle[0]),1)) + """ degrees counterclockwise"""
         else:
             dir = str(round(abs(diff_angle[0]),1)) + """ degrees clockwise"""
 
-        if agents[id_agent].entering:
-            agent_orientation = agents[id_agent].target[2]
-            if agent_orientation > np.pi:
-                agent_orientation = agent_orientation - 2 * np.pi
-            elif agent_orientation <= -np.pi:
-                agent_orientation = agent_orientation + 2 * np.pi
+        if agents[id_agent].type in env['Vehicle Specification']['types'] or agents[id_agent].type in env['Bicycle Specification']['types']:
+            if agents[id_agent].entering:
+                agent_orientation = agents[id_agent].target[2]
+                if agent_orientation > np.pi:
+                    agent_orientation = agent_orientation - 2 * np.pi
+                elif agent_orientation <= -np.pi:
+                    agent_orientation = agent_orientation + 2 * np.pi
 
-            if agent_orientation == 0:  # coming from the left
-                info_1 = """is coming from the left entrance of the cross with respect to you"""
-            elif agent_orientation == - np.pi / 2:  # coming from the opposite direction
-                info_1 = """is coming from the entrance in front of you"""
-            elif agent_orientation == np.pi:  # coming from the right direction
-                info_1 = """is coming from the right entrance of the cross with respect to you"""
-            else:
-                print('ID agent', id_agent)
-                print('Orientation agent', agent_orientation)
-        elif agents[id_agent].exiting and agents[id_agent].inside_cross:
-            agent_orientation = agents[id_agent].target[2]
-            if agent_orientation > np.pi:
-                agent_orientation = agent_orientation - 2 * np.pi
-            elif agent_orientation <= -np.pi:
-                agent_orientation = agent_orientation + 2 * np.pi
+                if agent_orientation == 0:  # coming from the left
+                    info_1 = """is coming from the left entrance of the cross with respect to you"""
+                elif agent_orientation == - np.pi / 2:  # coming from the opposite direction
+                    info_1 = """is coming from the entrance in front of you"""
+                elif agent_orientation == np.pi:  # coming from the right direction
+                    info_1 = """is coming from the right entrance of the cross with respect to you"""
+                else:
+                    print('ID agent', id_agent)
+                    print('Orientation agent', agent_orientation)
+                    error()
+            elif agents[id_agent].exiting and agents[id_agent].inside_cross:
+                agent_orientation = agents[id_agent].target[2]
+                if agent_orientation > np.pi:
+                    agent_orientation = agent_orientation - 2 * np.pi
+                elif agent_orientation <= -np.pi:
+                    agent_orientation = agent_orientation + 2 * np.pi
 
-            if agent_orientation == 0:
-                info_1 = """is going to the exit of the cross on your right"""
-            elif agent_orientation == np.pi / 2:
-                info_1 = """is going to the exit of the cross in front of you"""
-            elif agent_orientation == np.pi:
-                info_1 = """is going to the exit of the cross on your left"""
-            elif agent_orientation == - np.pi / 2:
-                info_1 = """is going to the exit of the cross next ot you"""
+                if agent_orientation == 0:
+                    info_1 = """is going to the exit of the cross on your right"""
+                elif agent_orientation == np.pi / 2:
+                    info_1 = """is going to the exit of the cross in front of you"""
+                elif agent_orientation == np.pi:
+                    info_1 = """is going to the exit of the cross on your left"""
+                elif agent_orientation == - np.pi / 2:
+                    info_1 = """is going to the exit of the cross next ot you"""
+                else:
+                    print('ID agent', id_agent)
+                    print('Orientation agent', agent_orientation)
+                    error()
             else:
-                print('ID agent', id_agent)
-                print('Orientation agent', agent_orientation)
-        else:
-            info_1 = """is going away from the cross"""
+                info_1 = """is going away from the cross"""
+        elif agents[id_agent].type in env['Pedestrians Specification']['types']:
+            if agents[id_agent].x < -6 and agents[id_agent].y < 6 and agents[id_agent].y > -6:
+                info_1 = """is crossing the street"""
+            elif agents[id_agent].x > 6 and agents[id_agent].y < 6 and agents[id_agent].y > -6:
+                info_1 = """is crossing the street"""
+            elif agents[id_agent].y < -6 and agents[id_agent].x < 6 and agents[id_agent].x > -6:
+                info_1 = """is crossing the street"""
+            elif agents[id_agent].y > 6 and agents[id_agent].x < 6 and agents[id_agent].x > -6:
+                info_1 = """is crossing the street"""
+            elif agents[id_agent].x >= -6 and agents[id_agent].x <= 6 and agents[id_agent].y >= -6 and agents[
+                id_agent].y <= 6:
+                info_1 = """is crossing the street"""
+            else:
+                info_1 = """is moving near the intersection"""
 
         description = description + """
 Information for agent """ + str(id_agent) + """:
-    (1) is a """ + agents[id_agent].type + """
+    (1) is a """ + (agents[id_agent].type + ' with SIRENS ON, you have to leave the space to this vehicle' if agents[id_agent].type == 'emergency car' else agents[id_agent].type) + """
     (2) """ + info_1 + """
-    (3) is """ + str(round(np.linalg.norm(ego.position - agents[id_agent].position),1)) + """ m away from you
-    (4) has a velocity of """ + str(round(agents[id_agent].velocity[0],1)) + """ m/s
+    (3) is """ + str(round(np.linalg.norm(ego.position - agents[id_agent].position), 1)) + """ m away from you
+    (4) has a velocity of """ + str(round(agents[id_agent].velocity[0], 1)) + """ m/s
     (5) has a direction of """ + dir + """ with respect to your orientation
         """
+
     if ego.exiting and ego.inside_cross and np.linalg.norm(ego.position - ego.exit['position']) <= 1:
         command = """
 possible_actions = ['go to the entry', 'go to the exit', 'go to the final_target', 'brakes']
@@ -1331,55 +1361,84 @@ agents = ["""
         else:
             name_agents = name_agents + """'""" + id_agent + """', """
 
-        diff_angle = (ego.theta - agents[id_agent].theta) * 180 / np.pi
+        if agents[id_agent].type in env['Pedestrians Specification']['types']:
+            if abs(agents[id_agent].v_x) <= 0.01:
+                if agents[id_agent].v_y < 0:
+                    diff_angle = (ego.theta - (-np.pi / 2)) * 180 / np.pi
+                elif agents[id_agent].v_y > 0:
+                    diff_angle = (ego.theta - (np.pi / 2)) * 180 / np.pi
+            elif abs(agents[id_agent].v_y) <= 0.01:
+                if agents[id_agent].v_x < 0:
+                    diff_angle = (ego.theta - (np.pi)) * 180 / np.pi
+                elif agents[id_agent].v_x > 0:
+                    diff_angle = (ego.theta - 0) * 180 / np.pi
+        elif agents[id_agent].type in env['Vehicle Specification']['types']:
+            diff_angle = (ego.theta - agents[id_agent].theta) * 180 / np.pi
+        elif agents[id_agent].type in env['Bicycle Specification']['types']:
+            diff_angle = (ego.theta - agents[id_agent].theta) * 180 / np.pi
+
         if diff_angle < 0:
             dir = str(round(abs(diff_angle[0]),1)) + """ degrees counterclockwise"""
         else:
             dir = str(round(abs(diff_angle[0]),1)) + """ degrees clockwise"""
 
-        if agents[id_agent].entering:
-            agent_orientation = agents[id_agent].target[2]
-            if agent_orientation > np.pi:
-                agent_orientation = agent_orientation - 2 * np.pi
-            elif agent_orientation <= -np.pi:
-                agent_orientation = agent_orientation + 2 * np.pi
+        if agents[id_agent].type in env['Vehicle Specification']['types'] or agents[id_agent].type in env['Bicycle Specification']['types']:
+            if agents[id_agent].entering:
+                agent_orientation = agents[id_agent].target[2]
+                if agent_orientation > np.pi:
+                    agent_orientation = agent_orientation - 2 * np.pi
+                elif agent_orientation <= -np.pi:
+                    agent_orientation = agent_orientation + 2 * np.pi
 
-            if agent_orientation == 0:  # coming from the left
-                info_1 = """is coming from the left entrance of the cross with respect to you"""
-            elif agent_orientation == - np.pi / 2:  # coming from the opposite direction
-                info_1 = """is coming from the entrance in front of you"""
-            elif agent_orientation == np.pi:  # coming from the right direction
-                info_1 = """is coming from the right entrance of the cross with respect to you"""
-            else:
-                print('ID agent', id_agent)
-                print('Orientation agent', agent_orientation)
-        elif agents[id_agent].exiting and agents[id_agent].inside_cross:
-            agent_orientation = agents[id_agent].target[2]
-            if agent_orientation > np.pi:
-                agent_orientation = agent_orientation - 2 * np.pi
-            elif agent_orientation <= -np.pi:
-                agent_orientation = agent_orientation + 2 * np.pi
+                if agent_orientation == 0:  # coming from the left
+                    info_1 = """is coming from the left entrance of the cross with respect to you"""
+                elif agent_orientation == - np.pi / 2:  # coming from the opposite direction
+                    info_1 = """is coming from the entrance in front of you"""
+                elif agent_orientation == np.pi:  # coming from the right direction
+                    info_1 = """is coming from the right entrance of the cross with respect to you"""
+                else:
+                    print('ID agent', id_agent)
+                    print('Orientation agent', agent_orientation)
+            elif agents[id_agent].exiting and agents[id_agent].inside_cross:
+                agent_orientation = agents[id_agent].target[2]
+                if agent_orientation > np.pi:
+                    agent_orientation = agent_orientation - 2 * np.pi
+                elif agent_orientation <= -np.pi:
+                    agent_orientation = agent_orientation + 2 * np.pi
 
-            if agent_orientation == 0:
-                info_1 = """is going to the exit of the cross on your right"""
-            elif agent_orientation == np.pi / 2:
-                info_1 = """is going to the exit of the cross in front of you"""
-            elif agent_orientation == np.pi:
-                info_1 = """is going to the exit of the cross on your left"""
-            elif agent_orientation == - np.pi / 2:
-                info_1 = """is going to the exit of the cross next ot you"""
+                if agent_orientation == 0:
+                    info_1 = """is going to the exit of the cross on your right"""
+                elif agent_orientation == np.pi / 2:
+                    info_1 = """is going to the exit of the cross in front of you"""
+                elif agent_orientation == np.pi:
+                    info_1 = """is going to the exit of the cross on your left"""
+                elif agent_orientation == - np.pi / 2:
+                    info_1 = """is going to the exit of the cross next ot you"""
+                else:
+                    print('ID agent', id_agent)
+                    print('Orientation agent', agent_orientation)
             else:
-                print('ID agent', id_agent)
-                print('Orientation agent', agent_orientation)
-        else:
-            info_1 = """is going away from the cross"""
+                info_1 = """is going away from the cross"""
+        elif agents[id_agent].type in env['Pedestrians Specification']['types']:
+            if agents[id_agent].x < -6 and agents[id_agent].y < 6 and agents[id_agent].y > -6:
+                info_1 = """is crossing the street"""
+            elif agents[id_agent].x > 6 and agents[id_agent].y < 6 and agents[id_agent].y > -6:
+                info_1 = """is crossing the street"""
+            elif agents[id_agent].y < -6 and agents[id_agent].x < 6 and agents[id_agent].x > -6:
+                info_1 = """is crossing the street"""
+            elif agents[id_agent].y > 6 and agents[id_agent].x < 6 and agents[id_agent].x > -6:
+                info_1 = """is crossing the street"""
+            elif agents[id_agent].x >= -6 and agents[id_agent].x <= 6 and agents[id_agent].y >= -6 and agents[id_agent].y <= 6:
+                info_1 = """is crossing the street"""
+            else:
+                info_1 = """is moving near the intersection"""
 
         description = description + """
 Information for agent """ + str(id_agent) + """:
-    (1) is a """ + agents[id_agent].type + """
+    (1) is a """ + (agents[id_agent].type + ' with SIRENS ON, you have to leave the space to this vehicle' if agents[id_agent].type == 'emergency car' else agents[id_agent].type) + """
     (2) """ + info_1 + """
-    (3) is """ + str(round(np.linalg.norm(ego.position - agents[id_agent].position),1)) + """ m away from you
-    (4) has a velocity of """ + str(round(agents[id_agent].velocity[0],1)) + """ m/s
+    (3) is """ + str(round(np.linalg.norm(ego.position - agents[id_agent].position), 1)) + """ m away from you
+    (4) has a velocity of """ + str(round(agents[id_agent].velocity[0], 1)) + """ m/s
     (5) has a direction of """ + dir + """ with respect to your orientation
         """
     if ego.exiting and ego.inside_cross and np.linalg.norm(ego.position - ego.exit['position']) <= 1:
