@@ -1,6 +1,9 @@
 import numpy as np
 import casadi as ca
 import random
+from shapely.geometry import Point
+from shapely.ops import unary_union
+from scipy.spatial import ConvexHull
 
 class Pedestrian:
     def __init__(self, type, info_pedestrian, delta_t):
@@ -150,18 +153,44 @@ class Pedestrian:
                              [-self.acc_limits[0]]])
 
     def trajecotry_estimation(self):
-        input = np.zeros((2,1))
+        input = np.zeros((self.m,1))
         self.traj_estimation = np.zeros((self.n, self.N + 1))
         self.traj_estimation[:, 0] = self.state[:, 0]
         for k in range(self.N):
-            if k <= self.N:
-                self.traj_estimation[:, k+1] = self.A @ self.traj_estimation[:, k] #+ self.B @ input
-            else:
-                self.traj_estimation[0, k + 1] = self.traj_estimation[0, k]
-                self.traj_estimation[1, k + 1] = self.traj_estimation[1, k]
-                self.traj_estimation[2, k + 1] = self.traj_estimation[2, k]
-                self.traj_estimation[3, k + 1] = self.traj_estimation[3, k]
+            self.traj_estimation[:, k+1] = self.A @ self.traj_estimation[:, k] #+ self.B @ input
         self.previous_opt_sol['X'] = self.traj_estimation
+
+    def trajectory_area_estimation(self):
+        input = np.zeros((self.m,3))
+        off_set = 0.02
+        if abs(self.v_x) < 0.01:
+            input[0, 1] = -off_set
+            input[0, 2] = off_set
+        elif abs(self.v_y) < 0.01:
+            input[1, 1] = -off_set
+            input[1, 2] = off_set
+        traj_estimation = np.zeros((self.n, self.N + 1, 3))
+        traj_estimation[:, 0, 0] = self.state[:, 0]
+        traj_estimation[:, 0, 1] = self.state[:, 0]
+        traj_estimation[:, 0, 2] = self.state[:, 0]
+        circles = []
+        circles.append(Point(traj_estimation[0, 0, 0], traj_estimation[1, 0, 0]).buffer(self.security_dist))
+        circles.append(Point(traj_estimation[0, 0, 1], traj_estimation[1, 0, 1]).buffer(self.security_dist))
+        circles.append(Point(traj_estimation[0, 0, 2], traj_estimation[1, 0, 2]).buffer(self.security_dist))
+
+        for k in range(self.N):
+            if k == 3:
+                input[0, 1] = 0
+                input[0, 2] = 0
+                input[1, 1] = 0
+                input[1, 2] = 0
+            for j in range(3):
+                traj_estimation[:, k + 1, j] = self.A @ traj_estimation[:, k, j]  + self.B @ input[:, j]
+                circles.append(Point(traj_estimation[0, k + 1, j], traj_estimation[1, k + 1, j]).buffer(self.security_dist))
+
+        union = unary_union(circles)
+        convex_hull = union.convex_hull
+        self.hull = ConvexHull(convex_hull.exterior.coords[:])
 
     def trackingMPC(self, other_agents, ego, circular_obstacles, t):
 

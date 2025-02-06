@@ -7,7 +7,7 @@ def SimulationConfig():
     SimulationParam = {'Save middle results': True,
                        'With LLM car': True,
                        'Describer active': False,
-                       'Timestep': 0.2, # [s]
+                       'Timestep': 0.1, # [s]
                        'Environment': 0,
                        #'Query': 'go straight to the exit in front of you',
                        #'Query': 'go to the exit on the right',
@@ -19,18 +19,18 @@ def SimulationConfig():
                            },
                            'Ego': {
                                'SF': {
-                                   'Active': False,
+                                   'Active': True,
                                    'Horizon': 20,
                                    'Replan': {
                                        'Active': False,
                                        'toll': 10
                                    },
                                    'Use LLM output': False,
-                                   'Soft': False
+                                   'Soft': True
                                },
                                'LLM': {
                                    'Horizon': 20,
-                                   'Soft': False,
+                                   'Soft': True,
                                    'Terminal set': False,
                                    'Reasoning': False
                                }

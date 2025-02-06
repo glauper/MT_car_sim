@@ -23,7 +23,7 @@ Rules:
     (8) If you want to instruct the car to move DO NOT specify constraints on the agents, someone else will take car of that. You have to consider the agents only to understand if you can go to your target or wait.
     (9) If you are coming to the cross and there is an other car, which is going to his exit, you MUST choose to move to your exit only if you will not interfere with his trajectory. 
     (10) If a car is going to his exit before you, try to understand from previous descriptions if this car is going to his exit before you because it have priority over you. In this case you should wait that this car pass.
-    (11) If an agent is less then 4m away from you, you MUST brakes() and wait that this agent to pass as first task.
+    (11) If an agent is less than 4 metres away, you MUST brake() and wait for this agent to pass as the first task. You may also consider brake() at greater distances if you deem it necessary.
     
 The description of the situation will give you this list of information about the other agents:
     (1) The type of agent (vehicle, pedestrian, bicycle,...)
@@ -42,7 +42,7 @@ Here are some general examples:
 objects = ['entry', 'exit', 'final_target']
 agents = ['0', '1']
 # Description: You are approaching a road cross with four entrances and four exits. There are no special road signs, so the right hand rule applies. 
-You are coming in the cross from one of the entrances, where the maximum permitted speed is 2 m/s.
+You are coming in the cross from one of the entrances, where the maximum permitted speed is 8 m/s.
 The entry in the cross of your lane is 2 m away and you are moving with a velocity of 2 m/s. The other three entries to the cross are around 12 m away from your entry.
 There are other 2 agents moving in the region of the road cross.
 Information for agent 0:
@@ -59,13 +59,13 @@ Information for agent 1:
     (5) has a direction of 90 degrees clockwise with respect to your orientation 
 # Query: go to the exit on your left
 {
-    "tasks": ["go to the entry, the maximum speed is 2 m/s", "brakes() and wait agent 0 to pass" ,"go the exits on the left, the maximum speed is 2 m/s", "go to final_target, the maximum speed is 2 m/s"]
+    "tasks": ["go to the entry, the maximum speed is 8 m/s", "brakes() and wait agent 0 to pass" ,"go the exits on the left, the maximum speed is 8 m/s", "go to final_target, the maximum speed is 8 m/s"]
 }
 
 objects = ['entry', 'exit', 'final_target']
 agents = ['0', '1']
 # Description: You are approaching a road cross with four entrances and four exits. There are no special road signs, so the right hand rule applies. 
-You are coming in the cross from one of the entrances, where the maximum permitted speed is 2 m/s.
+You are coming in the cross from one of the entrances, where the maximum permitted speed is 8 m/s.
 The entry in the cross of your lane is 0.5 m away and you are moving with a velocity of 2 m/s. The other three entries to the cross are around 12 m away from your entry.
 There are other 2 agents moving in the region of the road cross.
 Information for agent 0:
@@ -82,7 +82,7 @@ Information for agent 1:
     (5) has a direction of 90 degrees counterclockwise with respect to your orientation 
 # Query: go to the exit on your right
 {
-    "tasks": ["brakes() and wait agent 1 to pass", "go to the exit on the right, the maximum speed is 2 m/s", "go to final_target, the maximum speed is 2 m/s"]
+    "tasks": ["brakes() and wait agent 1 to pass", "go to the exit on the right, the maximum speed is 8 m/s", "go to final_target, the maximum speed is 8 m/s"]
 }
         """
     return TP_PROMPT

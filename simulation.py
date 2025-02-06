@@ -53,6 +53,7 @@ while run_simulation:
         id_vehicle = int(name_vehicle)
         if agents[name_vehicle].type in env['Pedestrians Specification']['types']:
             agents[name_vehicle].trajecotry_estimation()
+            agents[name_vehicle].trajectory_area_estimation()
             if agents[name_vehicle].type == 'adult':
                 away_flag = True
                 for other_agent in order_optimization:
@@ -79,6 +80,7 @@ while run_simulation:
             other_agents[name_vehicle] = agents[name_vehicle]
         elif agents[name_vehicle].entering or agents[name_vehicle].exiting:
             agents[name_vehicle].trajecotry_estimation()
+            agents[name_vehicle].trajectory_area_estimation()
             input[f'agent {id_vehicle}'] = agents[name_vehicle].trackingMPC(other_agents, ego_vehicle, circular_obstacles, t)
             other_agents[name_vehicle] = agents[name_vehicle]
             if SimulationParam['With LLM car']:
@@ -100,6 +102,7 @@ while run_simulation:
         next_task = False
         if 'brakes()' in Language_Module.TP['tasks'][Language_Module.task_status]:
             ego_brake = True
+            ego_vehicle.safe_set['computed in optimization'] = False
             # This such because when it brakes does not call all the time TP base on the old SF cost
             ego_vehicle.previous_opt_sol_SF['Cost'] = 0
             ego_vehicle.previous_opt_sol['Cost'] = 0
@@ -131,6 +134,7 @@ while run_simulation:
             #        next_task = True
         elif 'wait' in Language_Module.TP['tasks'][Language_Module.task_status]:
             ego_brake = True
+            ego_vehicle.safe_set['computed in optimization'] = False
             # This such because when it brakes does not call all the time TP base on the old SF cost
             ego_vehicle.previous_opt_sol_SF['Cost'] = 0
             ego_vehicle.previous_opt_sol['Cost'] = 0
@@ -167,6 +171,8 @@ while run_simulation:
         #    if abs(ego_vehicle.velocity) <= 0.01:
         #        next_task = True
         else:
+            ego_vehicle.find_safe_set(agents, circular_obstacles)
+            ego_vehicle.safe_set['computed in optimization'] = True
             # Check if necessary to have new Optimization Design
             if len(Language_Module.OD) == 0:
                 print('Call OD the first time, for :', Language_Module.TP['tasks'][Language_Module.task_status])
@@ -204,7 +210,9 @@ while run_simulation:
                     info = {'street speed limit': ego_vehicle.final_target['max vel']}
                 # Soft SF
                 if SimulationParam['Controller']['Ego']['SF']['Soft']:
-                    input_ego = ego_vehicle.soft_SF(input_ego, agents, circular_obstacles, t, info)
+                    #input_ego = ego_vehicle.soft_SF(input_ego, agents, circular_obstacles, t, info)
+                    psi = ego_vehicle.psi_optimization(agents, circular_obstacles, t, info)
+                    input_ego = ego_vehicle.soft_SF_psi_opt(input_ego, agents, circular_obstacles, t, info, psi)
                     print('Cost soft SF ', ego_vehicle.previous_opt_sol_SF['Cost'])
                     if not ego_vehicle.success_solver_SF:
                         Language_Module.final_messages.append({'Vehicle': 'No success for soft SF solver',
@@ -296,7 +304,7 @@ while run_simulation:
         if all(reach_end_target):
             run_simulation = False
 
-    if t == 300:
+    if t == 400:
         counter['motivation'] = 'End simulation: because max simulation steps are reached.'
         run_simulation = False
     elif counter['TP calls'] >= 25:

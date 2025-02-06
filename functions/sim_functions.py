@@ -55,6 +55,9 @@ def sim_init(counter, type_simulation):
         ego_vehicle = Vehicle(type, info_vehicle, delta_t)
         ego_vehicle.init_system_constraints(env["State space"], env['Ego Entrance']['speed limit'])
         ego_vehicle.init_state_for_LLM(env, SimulationParam)
+        #ego_vehicle.trajectory_area_estimation()
+        ego_vehicle.find_safe_set(agents, circular_obstacles)
+        ego_vehicle.safe_set['computed in optimization'] = True
         if not ego_vehicle.use_LLM_output_in_SF:
             ego_vehicle.update_velocity_limits(env)
     else:
@@ -196,25 +199,21 @@ def agents_init(env, delta_t, SimulationParam):
         agents[f'{i}'].init_trackingMPC(SimulationParam['Controller']['Agents']['Horizon'])
         if SimulationParam['Environment'] == 5:
             agents[f'{i}'] = env_5_init(agents[f'{i}'])
+        agents[f'{i}'].trajectory_area_estimation()
 
     nr_vehicles = len(agents)
     for i in range(env['Number Pedestrians']):
         if i % 2 == 0:
             type = 'adult'
-            info_adult = env['Pedestrians Specification']['adult']
-            agents[f'{i + nr_vehicles}'] = Pedestrian(type, info_adult, delta_t)
-            agents[f'{i + nr_vehicles}'].init(env['State space'],
-                                              env['Pedestrians Specification']['adult']['velocity limits'],
-                                              SimulationParam['Controller']['Agents']['Horizon'])
-            agents[f'{i + nr_vehicles}'].trajecotry_estimation()
         else:
             type = 'children'
-            info_children = env['Pedestrians Specification']['children']
-            agents[f'{i + nr_vehicles}'] = Pedestrian(type, info_children, delta_t)
-            agents[f'{i + nr_vehicles}'].init(env['State space'],
-                                              env['Pedestrians Specification']['children']['velocity limits'],
-                                              SimulationParam['Controller']['Agents']['Horizon'])
-            agents[f'{i + nr_vehicles}'].trajecotry_estimation()
+        info_pedestrians = env['Pedestrians Specification'][type]
+        agents[f'{i + nr_vehicles}'] = Pedestrian(type, info_pedestrians, delta_t)
+        agents[f'{i + nr_vehicles}'].init(env['State space'],
+                                          env['Pedestrians Specification'][type]['velocity limits'],
+                                          SimulationParam['Controller']['Agents']['Horizon'])
+        agents[f'{i + nr_vehicles}'].trajecotry_estimation()
+        agents[f'{i + nr_vehicles}'].trajectory_area_estimation()
 
     nr_agents = len(agents)
     for i in range(env['Number Bicycles']):
@@ -226,6 +225,7 @@ def agents_init(env, delta_t, SimulationParam):
         agents[f'{i + nr_agents}'].init_system_constraints(env["State space"], env['Entrances'][key_init]['speed limit'])
         options_init_state.remove(key_init)
         agents[f'{i + nr_agents}'].init_trackingMPC(SimulationParam['Controller']['Agents']['Horizon'])
+        agents[f'{i + nr_agents}'].trajectory_area_estimation()
 
     return agents
 
@@ -284,14 +284,15 @@ def results_init(env, agents):
         results[f'agent {id_vehicle}']['type'] = agents[f'{id_vehicle}'].type
 
         if results[f'agent {id_vehicle}']['type'] == 'adult' or results[f'agent {id_vehicle}']['type'] == 'children':
+            results[f'agent {id_vehicle}']['hull'] = []
             results[f'agent {id_vehicle}']['x coord'] = []
             results[f'agent {id_vehicle}']['y coord'] = []
             results[f'agent {id_vehicle}']['v_x coord'] = []
             results[f'agent {id_vehicle}']['v_y coord'] = []
             results[f'agent {id_vehicle}']['trajectory estimation x'] = []
             results[f'agent {id_vehicle}']['trajectory estimation y'] = []
-
         else:
+            results[f'agent {id_vehicle}']['hull'] = []
             results[f'agent {id_vehicle}']['x coord'] = []
             results[f'agent {id_vehicle}']['y coord'] = []
             results[f'agent {id_vehicle}']['velocity'] = []
@@ -300,6 +301,7 @@ def results_init(env, agents):
             results[f'agent {id_vehicle}']['x coord pred'] = []
             results[f'agent {id_vehicle}']['y coord pred'] = []
             if agents[f'{id_vehicle}'].LLM_car:
+                results[f'agent {id_vehicle}']['safe set'] = []
                 results[f'agent {id_vehicle}']['x coord pred SF'] = []
                 results[f'agent {id_vehicle}']['y coord pred SF'] = []
                 results[f'agent {id_vehicle}']['acc pred SF'] = []
@@ -324,6 +326,7 @@ def results_update_and_save(env, agents, results, ego_brake):
 
     for id_vehicle, name_vehicle in enumerate(agents):
         if results[f'agent {id_vehicle}']['type'] == 'adult' or results[f'agent {id_vehicle}']['type'] == 'children':
+            results[f'agent {id_vehicle}']['hull'].append(agents[name_vehicle].hull.points.tolist())
             results[f'agent {id_vehicle}']['x coord'].append(float(agents[name_vehicle].x))
             results[f'agent {id_vehicle}']['y coord'].append(float(agents[name_vehicle].y))
             results[f'agent {id_vehicle}']['v_x coord'].append(float(agents[name_vehicle].v_x))
@@ -331,6 +334,7 @@ def results_update_and_save(env, agents, results, ego_brake):
             results[f'agent {id_vehicle}']['trajectory estimation x'].append(list(agents[name_vehicle].traj_estimation[0]))
             results[f'agent {id_vehicle}']['trajectory estimation y'].append(list(agents[name_vehicle].traj_estimation[1]))
         else:
+            results[f'agent {id_vehicle}']['hull'].append(agents[name_vehicle].hull.points.tolist())
             results[f'agent {id_vehicle}']['x coord'].append(float(agents[name_vehicle].x))
             results[f'agent {id_vehicle}']['y coord'].append(float(agents[name_vehicle].y))
             results[f'agent {id_vehicle}']['velocity'].append(float(agents[name_vehicle].velocity))
@@ -339,6 +343,12 @@ def results_update_and_save(env, agents, results, ego_brake):
             results[f'agent {id_vehicle}']['x coord pred'].append(list(agents[name_vehicle].previous_opt_sol['X'][0,:]))
             results[f'agent {id_vehicle}']['y coord pred'].append(list(agents[name_vehicle].previous_opt_sol['X'][1,:]))
             if agents[name_vehicle].LLM_car:
+                results[f'agent {id_vehicle}']['safe set'].append(list([agents[name_vehicle].safe_set['radius'],
+                                                                        agents[name_vehicle].safe_set['center'].tolist(),
+                                                                        agents[name_vehicle].safe_set['traj'][0,:].tolist(),
+                                                                        agents[name_vehicle].safe_set['traj'][1,:].tolist(),
+                                                                        agents[name_vehicle].safe_set['computed in optimization'],
+                                                                        agents[name_vehicle].safe_set['computed with traj']]))
                 results[f'agent {id_vehicle}']['x coord pred SF'].append(list(agents[name_vehicle].previous_opt_sol_SF['X'][0,:]))
                 results[f'agent {id_vehicle}']['y coord pred SF'].append(list(agents[name_vehicle].previous_opt_sol_SF['X'][1,:]))
                 if ego_brake:
@@ -519,68 +529,77 @@ def check_need_replan(ego_vehicle, agents, Language_Module, env, SimulationParam
         elif SimulationParam['Controller']['Ego']['SF']['Soft'] and not ego_brake:
             replan_flag = False
             slack_time_t = {}
-            for k in range(ego_vehicle.N_SF + 1):
-                # x coord limit
-                if k <= 3 and abs(ego_vehicle.previous_opt_sol_SF['psi_b_x'][0, k]) > 5:
+            for k in range(ego_vehicle.N_SF): # Think if +1 make sense...
+                pos_slack = np.linalg.norm(ego_vehicle.previous_opt_sol_psi_opt['psi_b_x'][0:-4, k])
+                if pos_slack > 5:
+                    replan_flag = True
+                    slack_time_t['position slacks'] = {'k = ' + str(k): pos_slack}
+                """# x coord limit
+                if k <= 3 and abs(ego_vehicle.previous_opt_sol_psi_opt['psi_b_x'][0, k]) > 5:
                     replan_flag = True
                     slack_time_t['x coord positive'] = {'k = ' + str(k):
-                                                            ego_vehicle.previous_opt_sol_SF['psi_b_x'][0, k]}
+                                                            ego_vehicle.previous_opt_sol_psi_opt['psi_b_x'][0, k]}
                 # x coord limit
-                if k <= 3 and abs(ego_vehicle.previous_opt_sol_SF['psi_b_x'][1, k]) > 5:
+                if k <= 3 and abs(ego_vehicle.previous_opt_sol_psi_opt['psi_b_x'][1, k]) > 5:
                     replan_flag = True
                     slack_time_t['x coord negative'] = {'k = ' + str(k):
-                                                          ego_vehicle.previous_opt_sol_SF['psi_b_x'][1, k]}
+                                                          ego_vehicle.previous_opt_sol_psi_opt['psi_b_x'][1, k]}
                 # y coord limit
-                if k <= 3 and abs(ego_vehicle.previous_opt_sol_SF['psi_b_x'][2, k]) > 5:
+                if k <= 3 and abs(ego_vehicle.previous_opt_sol_psi_opt['psi_b_x'][2, k]) > 5:
                     replan_flag = True
                     slack_time_t['y coord positive'] = {'k = ' + str(k):
-                                                          ego_vehicle.previous_opt_sol_SF['psi_b_x'][2, k]}
+                                                          ego_vehicle.previous_opt_sol_psi_opt['psi_b_x'][2, k]}
                 # y coord limit
-                if k <= 3 and abs(ego_vehicle.previous_opt_sol_SF['psi_b_x'][3, k]) > 5:
+                if k <= 3 and abs(ego_vehicle.previous_opt_sol_psi_opt['psi_b_x'][3, k]) > 5:
                     replan_flag = True
                     slack_time_t['y coord negative'] = {'k = ' + str(k):
-                                                          ego_vehicle.previous_opt_sol_SF['psi_b_x'][3, k]}
+                                                          ego_vehicle.previous_opt_sol_psi_opt['psi_b_x'][3, k]}"""
                 # theta coord limit
-                if k <= 3 and abs(ego_vehicle.previous_opt_sol_SF['psi_b_x'][4, k]) > np.pi:
+                if abs(ego_vehicle.previous_opt_sol_psi_opt['psi_b_x'][-4, k]) > np.pi:
                     replan_flag = True
                     slack_time_t['theta positive'] = {'k = ' + str(k):
-                                                          ego_vehicle.previous_opt_sol_SF['psi_b_x'][4, k]}
+                                                          ego_vehicle.previous_opt_sol_psi_opt['psi_b_x'][4, k]}
                 # theta coord limit
-                if k <= 3 and abs(ego_vehicle.previous_opt_sol_SF['psi_b_x'][5, k]) > np.pi:
+                if abs(ego_vehicle.previous_opt_sol_psi_opt['psi_b_x'][-3, k]) > np.pi:
                     replan_flag = True
                     slack_time_t['theta negative'] = {'k = ' + str(k):
-                                                          ego_vehicle.previous_opt_sol_SF['psi_b_x'][5, k]}
+                                                          ego_vehicle.previous_opt_sol_psi_opt['psi_b_x'][5, k]}
                 # velocity coord limit
-                if k <= 3 and abs(ego_vehicle.previous_opt_sol_SF['psi_b_x'][6, k]) > 1.4:
+                if abs(ego_vehicle.previous_opt_sol_psi_opt['psi_b_x'][-2, k]) > 1.4:
                     replan_flag = True
                     slack_time_t['velocity positive'] = {'k = ' + str(k):
-                                                          ego_vehicle.previous_opt_sol_SF['psi_b_x'][6, k]}
+                                                          ego_vehicle.previous_opt_sol_psi_opt['psi_b_x'][6, k]}
                 # velocity coord limit
-                if k <= 3 and abs(ego_vehicle.previous_opt_sol_SF['psi_b_x'][7, k]) > 1.4:
+                if abs(ego_vehicle.previous_opt_sol_psi_opt['psi_b_x'][-1, k]) > 1.4:
                     replan_flag = True
                     slack_time_t['velocity negative'] = {'k = ' + str(k):
-                                                          ego_vehicle.previous_opt_sol_SF['psi_b_x'][7, k]}
-                # velocity limit of the road
-                if k <= 3 and ego_vehicle.previous_opt_sol_SF['psi_v_limit'][k] > 1.4:
+                                                          ego_vehicle.previous_opt_sol_psi_opt['psi_b_x'][7, k]}
+                # the slack of the safe set
+                if k == ego_vehicle.N_SF -1 and abs(ego_vehicle.previous_opt_sol_psi_opt['psi_f']) > 1:
+                    replan_flag = True
+                    slack_time_t['velocity negative'] = {'k = ' + str(k):
+                                                          ego_vehicle.previous_opt_sol_psi_opt['psi_f']}
+                """# velocity limit of the road
+                if k <= 3 and ego_vehicle.previous_opt_sol_psi_opt['psi_v_limit'][k] > 1.4:
                     replan_flag = True
                     slack_time_t['velocity limit'] = {'k = ' + str(k):
-                                                          ego_vehicle.previous_opt_sol_SF['psi_v_limit'][k]}
+                                                          ego_vehicle.previous_opt_sol_psi_opt['psi_v_limit'][k]}
                 # constraint to agents
-                for id_agent in range(np.size(ego_vehicle.previous_opt_sol_SF['psi_agents'][:, k])):
-                    if k <= 5 and abs(ego_vehicle.previous_opt_sol_SF['psi_agents'][id_agent, k]) > 0.001:
+                for id_agent in range(np.size(ego_vehicle.previous_opt_sol_psi_opt['psi_agents'][:, k])):
+                    if k <= 5 and abs(ego_vehicle.previous_opt_sol_psi_opt['psi_agents'][id_agent, k]) > 0.001:
                         replan_flag = True
                         slack_time_t['agent ' + str(id_agent) + ' const'] = {'k = ' + str(k):
-                                                           ego_vehicle.previous_opt_sol_SF['psi_agents'][id_agent, k]}
-                    if k <= 10 and np.linalg.norm(ego_vehicle.previous_opt_sol_SF['X'][0:2, k] - agents[str(id_agent)].position) <= 4:
+                                                           ego_vehicle.previous_opt_sol_psi_opt['psi_agents'][id_agent, k]}
+                    if k <= 10 and np.linalg.norm(ego_vehicle.previous_opt_sol['X'][0:2, k] - agents[str(id_agent)].position) <= 4:
                         replan_flag = True
-                        slack_time_t['ego safe traj in agent ' + str(id_agent) + ' safe zone'] = {'k = ' + str(k): np.linalg.norm(ego_vehicle.previous_opt_sol_SF['X'][0:2, k] - agents[str(id_agent)].position)}
+                        slack_time_t['ego safe traj in agent ' + str(id_agent) + ' safe zone'] = {'k = ' + str(k): np.linalg.norm(ego_vehicle.previous_opt_sol['X'][0:2, k] - agents[str(id_agent)].position)}
                 # constraint to obstacles
-                for id_obst in range(np.size(ego_vehicle.previous_opt_sol_SF['psi_obst'][:, k])):
-                    if k <= 6 and abs(ego_vehicle.previous_opt_sol_SF['psi_obst'][id_obst, k]) > 0.1:
+                for id_obst in range(np.size(ego_vehicle.previous_opt_sol_psi_opt['psi_obst'][:, k])):
+                    if k <= 6 and abs(ego_vehicle.previous_opt_sol_psi_opt['psi_obst'][id_obst, k]) > 0.1:
                         replan_flag = True
                         slack_time_t['obst ' + str(id_obst) + ' const'] = {'k = ' + str(k):
-                                                         ego_vehicle.previous_opt_sol_SF['psi_obst'][id_obst, k]}
-                if np.linalg.norm(ego_vehicle.previous_opt_sol_SF['X'][0:2, -1] - ego_vehicle.previous_opt_sol['X'][0:2, -1]) > 6:
+                                                         ego_vehicle.previous_opt_sol_psi_opt['psi_obst'][id_obst, k]}"""
+                if np.linalg.norm(ego_vehicle.previous_opt_sol_psi_opt['X'][0:2, -1] - ego_vehicle.previous_opt_sol['X'][0:2, -1]) > 8:
                     replan_flag = True
                     slack_time_t['X_safe and X_LLM diverges'] = np.linalg.norm(ego_vehicle.previous_opt_sol_SF['X'][0:2, -1] - ego_vehicle.previous_opt_sol['X'][0:2, -1])
             if replan_flag == True:
