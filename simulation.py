@@ -191,9 +191,10 @@ while run_simulation:
 
             # Here MPC with LLM output
             if not SimulationParam['Controller']['Ego']['LLM']['Soft']:
-                input_ego = ego_vehicle.MPC_LLM(agents, circular_obstacles, t, Language_Module)
+                #input_ego = ego_vehicle.MPC_LLM(agents, circular_obstacles, t, Language_Module)
+                error()
             else:
-                input_ego = ego_vehicle.soft_MPC_LLM(agents, circular_obstacles, t, Language_Module)
+                input_ego = ego_vehicle.Control_Module(agents, circular_obstacles, t, Language_Module)
 
             if not ego_vehicle.success_solver_MPC_LLM:
                 Language_Module.final_messages.append({'Vehicle': 'No success for MPC LLM solver',

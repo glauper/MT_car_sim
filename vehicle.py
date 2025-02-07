@@ -987,33 +987,82 @@ class Vehicle:
 
         return new_hull, good_size, opt_varibles
 
-    def MPC_LLM(self, agents, circular_obstacles, t, llm):
+    def MPC_LLM(self, agents, circular_obstacles, t, llm, info):
+        nr_ineq_const = len(llm.OD["inequality_constraints"])
+        nr_eq_const = len(llm.OD["equality_constraints"])
+
+        A_hull = self.hull.equations[:, :-1]
+        b_hull = self.hull.equations[:, -1]
+
+        A = np.zeros((np.shape(A_hull)[0] + 4, self.n))
+        b = np.zeros((np.shape(A_hull)[0] + 4, 1))
+        A[0:np.shape(A_hull)[0], 0:2] = A_hull
+        A[-4:, :] = self.A_x[-4:, :]
+        b[0:np.shape(A_hull)[0], 0] = b_hull
+        b[-4:, :] = -self.b_x[-4:, :]
+        b[-2, :] = -info['street speed limit']
 
         opti = ca.Opti()
 
         X = opti.variable(self.n, self.N + 1)
         U = opti.variable(self.m, self.N)
+        psi_b_x = opti.variable(np.size(b), self.N_SF + 1)
+        psi_v = opti.variable(1,1)
+        psi_f = opti.variable(1,1)
+        # LLM cost and constraints
+        if nr_ineq_const + nr_eq_const >= 1:
+            epsilon_LLM_constraints = opti.variable(nr_ineq_const + nr_eq_const, self.N + 1)
+        else:
+            epsilon_LLM_constraints = 0
 
         cost = 0
         for k in range(self.N):
             # LLM cost and constraints
-            cost, opti = self.OD_output(opti, cost, llm, X[:,k], U[:,k], agents, t)
+            if nr_ineq_const + nr_eq_const >= 1:
+                cost, opti = self.soft_OD_output(opti, cost, llm, X[:, k], U[:, k], agents,
+                                                 epsilon_LLM_constraints[:, k], t)
+            else:
+                cost, opti = self.OD_output(opti, cost, llm, X[:, k], U[:, k], agents, t)
 
+            cost += (psi_b_x[:, k].T @ psi_b_x[:, k])
+            for j in range(np.size(b)):
+                opti.subject_to(0 <= psi_b_x[j, k])
             # State and Input constraints
-            opti.subject_to(self.A_x @ X[:, k + 1] <= self.b_x)
+            opti.subject_to(A @ X[:, k] + b <= psi_b_x[:, k])
             opti.subject_to(self.A_u @ U[:, k] <= self.b_u)
 
             # System dynamics constraints
             opti.subject_to(self.dynamics_constraints(X[:, k + 1], X[:, k], U[:, k]))
 
-        cost, opti = self.OD_output(opti, cost, llm, X[:,-1], U[:,-1], agents, t) # U[-1] and X[-1] do not corresponds!
-
-        # Constraint for the steady state
-        if self.terminal_set:
-            opti.subject_to(X[3,-1] == 0)
+        # LLM cost and constraints
+        if nr_ineq_const + nr_eq_const >= 1:
+            cost, opti = self.soft_OD_output(opti, cost, llm, X[:, -1], U[:, -1], agents,
+                                             epsilon_LLM_constraints[:, -1], t)
+        else:
+            cost, opti = self.OD_output(opti, cost, llm, X[:,-1], U[:,-1], agents, t) # U[-1] and X[-1] do not corresponds!
 
         # Initial state
         opti.subject_to(X[:, 0] == self.state)
+
+        # Terminal Constraints
+        cost += (psi_b_x[:, -1].T @ psi_b_x[:, -1])
+        for j in range(np.size(b)):
+            opti.subject_to(0 <= psi_b_x[j, -1])
+        opti.subject_to(A @ X[:, -1] + b <= psi_b_x[:, -1])
+
+        # Safe terminal set
+        px_S = self.safe_set['center'][0]
+        py_S = self.safe_set['center'][1]
+        R_S = self.safe_set['radius']
+        opti.subject_to((X[0, -1] - px_S) ** 2 + (X[1, -1] - py_S) ** 2 - R_S ** 2 <= psi_f)
+        opti.subject_to(X[3, -1] == psi_v)
+        opti.subject_to(0 <= psi_f)
+        opti.subject_to(0 <= psi_v)
+        cost += psi_f ** 2 + psi_v ** 2
+
+        """# Constraint for the steady state
+        if self.terminal_set:
+            opti.subject_to(X[3, -1] == 0)
 
         # Agents avoidance
         if len(agents) >= 1:
@@ -1032,7 +1081,7 @@ class Vehicle:
                 for k in range(self.N_SF + 1):
                     diff_x = (X[0, k] - circular_obstacles[id_obst]['center'][0]) ** 2 / (circular_obstacles[id_obst]['r_x']) ** 2
                     diff_y = (X[1, k] - circular_obstacles[id_obst]['center'][1]) ** 2 / (circular_obstacles[id_obst]['r_y']) ** 2
-                    opti.subject_to(diff_x + diff_y >= 1)
+                    opti.subject_to(diff_x + diff_y >= 1)"""
 
         opti.minimize(cost)
         # Solve the optimization problem
@@ -1040,12 +1089,18 @@ class Vehicle:
             self.trajecotry_estimation()
             opti.set_initial(X, self.traj_estimation)
             opti.set_initial(U, np.zeros((self.m, self.N)))
+            opti.set_initial(psi_b_x, np.zeros((np.size(b), self.N_SF + 1)))
+            opti.set_initial(psi_v, 0)
+            opti.set_initial(psi_f, 0)
         else:
             #opti.set_initial(X, self.previous_opt_sol_SF['X'])
             #opti.set_initial(U, self.previous_opt_sol_SF['U'])
             self.trajecotry_estimation()
             opti.set_initial(X, self.traj_estimation)
             opti.set_initial(U, np.zeros((self.m, self.N)))
+            opti.set_initial(psi_b_x, np.zeros((np.size(b), self.N_SF + 1)))
+            opti.set_initial(psi_v, 0)
+            opti.set_initial(psi_f, 0)
 
         try:
             opti.solver('ipopt')
@@ -1064,6 +1119,13 @@ class Vehicle:
         if opti.stats()['success']:
             self.previous_opt_sol['X'] = sol.value(X)
             self.previous_opt_sol['U'] = sol.value(U)
+            self.previous_opt_sol['psi_b_x'] = sol.value(psi_b_x)
+            self.previous_opt_sol['psi_v'] = sol.value(psi_v)
+            self.previous_opt_sol['psi_f'] = sol.value(psi_f)
+            if nr_ineq_const + nr_eq_const >= 1:
+                self.previous_opt_sol['epsilon_LLM_constraints'] = sol.value(epsilon_LLM_constraints).reshape(nr_ineq_const + nr_eq_const, self.N + 1)
+            else:
+                self.previous_opt_sol['epsilon_LLM_constraints'] = epsilon_LLM_constraints
             self.previous_opt_sol['Cost'] = sol.value(cost)
             input = sol.value(U)[:, 0].reshape((self.m, 1))
             self.success_solver_MPC_LLM = True
@@ -1112,7 +1174,7 @@ class Vehicle:
 
         return obj, opti
 
-    def soft_MPC_LLM(self, agents, circular_obstacles, t, llm):
+    def Control_Module(self, agents, circular_obstacles, t, llm):
         nr_ineq_const = len(llm.OD["inequality_constraints"])
         nr_eq_const = len(llm.OD["equality_constraints"])
 
@@ -1182,6 +1244,10 @@ class Vehicle:
             self.previous_opt_sol['X'] = sol.value(X)
             self.previous_opt_sol['U'] = sol.value(U)
             #self.previous_opt_sol_SF['psi_b_x'] = sol.value(psi_b_x)
+            if nr_ineq_const + nr_eq_const >= 1:
+                self.previous_opt_sol['epsilon_LLM_constraints'] = sol.value(epsilon_LLM_constraints)
+            else:
+                self.previous_opt_sol['epsilon_LLM_constraints'] = epsilon_LLM_constraints
             self.previous_opt_sol['Cost'] = sol.value(cost)
             input = sol.value(U)[:, 0].reshape((self.m, 1))
             self.success_solver_MPC_LLM = True

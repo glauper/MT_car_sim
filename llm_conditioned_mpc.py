@@ -100,6 +100,7 @@ while run_simulation:
         next_task = False
         if 'brakes' in LLM.TP['action chosen'][0]:
             ego_brake = True
+            ego_vehicle.safe_set['computed in optimization'] = False
             # This such because when it brakes does not call all the time TP base on the old SF cost
             ego_vehicle.previous_opt_sol_SF['Cost'] = 0
             ego_vehicle.previous_opt_sol['Cost'] = 0
@@ -111,12 +112,15 @@ while run_simulation:
                 next_task = True
         elif too_near:
             ego_brake = True
+            ego_vehicle.safe_set['computed in optimization'] = False
             LLM.final_messages.append({'Vehicle': 'brakes because there is a car too near',
                                        'time': t})
             ego_vehicle.previous_opt_sol_SF['Cost'] = 0
             if abs(ego_vehicle.velocity) <= 0.01:
                 next_task = True
         else:
+            ego_vehicle.find_safe_set(agents, circular_obstacles)
+            ego_vehicle.safe_set['computed in optimization'] = True
             if 'go to the entry' in LLM.TP['action chosen'][0]:
                 LLM.OD = {
                     "objective": "ca.norm_2(X - self.entry['state'])**2",
@@ -136,7 +140,14 @@ while run_simulation:
                 print('Action not possible')
                 error()
 
-            input_ego = ego_vehicle.MPC_LLM(agents, circular_obstacles, t, LLM)
+            if ego_vehicle.entering:
+                info = {'street speed limit': ego_vehicle.entry['max vel']}
+            elif ego_vehicle.exiting and ego_vehicle.inside_cross:
+                info = {'street speed limit': ego_vehicle.exit['max vel']}
+            else:
+                info = {'street speed limit': ego_vehicle.final_target['max vel']}
+
+            input_ego = ego_vehicle.MPC_LLM(agents, circular_obstacles, t, LLM, info)
             if not ego_vehicle.success_solver_MPC_LLM:
                 LLM.final_messages.append({'Vehicle': 'No success for MPC LLM solver',
                                                        'time': t})
@@ -251,16 +262,35 @@ while run_simulation:
                 end = time.time()
                 counter['elapsed time for LLM'].append(end - start)
                 counter['LLM calls'] += 1
-            elif not ego_vehicle.success_solver_MPC_LLM:
-                print('Call LLM: because no success of MPC LLM.')
-                ego_vehicle.t_subtask = 0
-                reason['MPC_LLM_not_solved'] = True
-                start = time.time()
-                LLM.recall_LLM(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
-                end = time.time()
-                counter['elapsed time for LLM'].append(end - start)
-                counter['LLM calls'] += 1
-                ego_vehicle.success_solver_MPC_LLM = True
+            elif not ego_brake:
+                replan_flag = False
+                for k in range(ego_vehicle.N_SF + 1):  # Think if +1 make sense...
+                    pos_slack = np.linalg.norm(ego_vehicle.previous_opt_sol['psi_b_x'][:, k])
+                    if pos_slack > 5:
+                        replan_flag = True
+                if abs(ego_vehicle.previous_opt_sol['psi_v']) > 4:
+                    replan_flag = True
+                if abs(ego_vehicle.previous_opt_sol['psi_f']) > 4:
+                    replan_flag = True
+                if np.shape(ego_vehicle.previous_opt_sol['epsilon_LLM_constraints']) == int:
+                    if ego_vehicle.previous_opt_sol['epsilon_LLM_constraints'] > 1:
+                        replan_flag = True
+                else:
+                    for k in range(ego_vehicle.N_SF + 1):
+                        norm_slack = np.linalg.norm(ego_vehicle.previous_opt_sol['epsilon_LLM_constraints'][:, k])
+                        if norm_slack > 1:
+                            replan_flag = True
+
+                if replan_flag == True:
+                    print('Call LLM: because MPC LLM have high slack variables.')
+                    ego_vehicle.t_subtask = 0
+                    reason['MPC_LLM_not_solved'] = True
+                    start = time.time()
+                    LLM.recall_LLM(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
+                    end = time.time()
+                    counter['elapsed time for LLM'].append(end - start)
+                    counter['LLM calls'] += 1
+                    ego_vehicle.success_solver_MPC_LLM = True
 
         for name_agent in agents:
             if agents[name_agent].type == 'emergency car':
