@@ -15,7 +15,7 @@ counter = {'crash': 0,
            'LLM calls': 1,
            'elapsed time for LLM': [],
            'too_near': 0,
-           'fail solver MPC LLM': 0}
+           'recall due to MPC LLM': 0}
 
 type_simulation = "llm_conditioned_mpc"
 
@@ -44,11 +44,12 @@ while run_simulation:
     # Controller to decide the trajectory of other agents
     other_agents = {}
     input = {}
-    too_near = False
+    #too_near = False
     for name_vehicle in order_optimization:
         id_vehicle = int(name_vehicle)
         if agents[name_vehicle].type in env['Pedestrians Specification']['types']:
             agents[name_vehicle].trajecotry_estimation()
+            agents[name_vehicle].trajectory_area_estimation()
             if agents[name_vehicle].type == 'adult':
                 away_flag = True
                 for other_agent in order_optimization:
@@ -79,6 +80,7 @@ while run_simulation:
             other_agents[name_vehicle] = agents[name_vehicle]
         elif agents[name_vehicle].entering or agents[name_vehicle].exiting:
             agents[name_vehicle].trajecotry_estimation()
+            agents[name_vehicle].trajectory_area_estimation()
             input[f'agent {id_vehicle}'] = agents[name_vehicle].trackingMPC(other_agents, ego_vehicle,
                                                                             circular_obstacles, t)
             other_agents[name_vehicle] = agents[name_vehicle]
@@ -110,14 +112,14 @@ while run_simulation:
                 next_task = True
             elif abs(ego_vehicle.velocity) <= 0.01:
                 next_task = True
-        elif too_near:
-            ego_brake = True
-            ego_vehicle.safe_set['computed in optimization'] = False
-            LLM.final_messages.append({'Vehicle': 'brakes because there is a car too near',
-                                       'time': t})
-            ego_vehicle.previous_opt_sol_SF['Cost'] = 0
-            if abs(ego_vehicle.velocity) <= 0.01:
-                next_task = True
+        #elif too_near:
+        #    ego_brake = True
+        #    ego_vehicle.safe_set['computed in optimization'] = False
+        #    LLM.final_messages.append({'Vehicle': 'brakes because there is a car too near',
+        #                               'time': t})
+        #    ego_vehicle.previous_opt_sol_SF['Cost'] = 0
+        #    if abs(ego_vehicle.velocity) <= 0.01:
+        #        next_task = True
         else:
             ego_vehicle.find_safe_set(agents, circular_obstacles)
             ego_vehicle.safe_set['computed in optimization'] = True
@@ -253,15 +255,15 @@ while run_simulation:
                 end = time.time()
                 counter['elapsed time for LLM'].append(end - start)
                 counter['LLM calls'] += 1
-            elif too_near:
-                print('Call LLM: because an agent is to near')
-                ego_vehicle.t_subtask = 0
-                reason['other_agent_too_near'] = True
-                start = time.time()
-                LLM.recall_LLM(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
-                end = time.time()
-                counter['elapsed time for LLM'].append(end - start)
-                counter['LLM calls'] += 1
+            #elif too_near:
+            #    print('Call LLM: because an agent is to near')
+            #    ego_vehicle.t_subtask = 0
+            #    reason['other_agent_too_near'] = True
+            #    start = time.time()
+            #    LLM.recall_LLM(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
+            #    end = time.time()
+            #    counter['elapsed time for LLM'].append(end - start)
+            #    counter['LLM calls'] += 1
             elif not ego_brake:
                 replan_flag = False
                 for k in range(ego_vehicle.N_SF + 1):  # Think if +1 make sense...
@@ -290,6 +292,7 @@ while run_simulation:
                     end = time.time()
                     counter['elapsed time for LLM'].append(end - start)
                     counter['LLM calls'] += 1
+                    counter['recall due to MPC LLM'] += 1
                     ego_vehicle.success_solver_MPC_LLM = True
 
         for name_agent in agents:
@@ -335,7 +338,7 @@ if SimulationParam['With LLM car']:
 print('How many crash: ', counter['crash'])
 print('How many times LLM is called: ', counter['LLM calls'])
 print('How many invasion of security area: ', counter['too_near'])
-print('How many times solver MPC LLM failed: ', counter['fail solver MPC LLM'])
+print('How many times LLM is called due to MPC LLM: ', counter['recall due to MPC LLM'])
 counter['Mean time for LLM'] = np.mean(counter['elapsed time for LLM'])
 print('Mean elapsed time for LLM to give output: ', counter['Mean time for LLM'])
 print('Motivation: ', counter['motivation'])

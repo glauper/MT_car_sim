@@ -6,3 +6,5 @@ casadi
 openai
 streamlit
 streamlit==1.34
+pandas
+openpyxl

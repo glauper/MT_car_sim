@@ -84,7 +84,7 @@ class Vehicle:
         query = sim_params['Query']
         self.LLM_car = True
         self.terminal_set = sim_params['Controller']['Ego']['LLM']['Terminal set']
-        self.use_LLM_output_in_SF = sim_params['Controller']['Ego']['SF']['Use LLM output']
+        #self.use_LLM_output_in_SF = sim_params['Controller']['Ego']['SF']['Use LLM output']
         self.SF_active = sim_params['Controller']['Ego']['SF']['Active']
         #self.SF_soft_active = sim_params['Controller']['Ego']['SF']['Soft']
         self.N = sim_params['Controller']['Ego']['LLM']['Horizon']
@@ -702,7 +702,7 @@ class Vehicle:
             error()
 
         if radius_safe_set is None:
-            l_square = 3
+            """l_square = 3
             safe_zone_not_find = True
             while safe_zone_not_find:
                 points = np.zeros((4, 2))
@@ -726,7 +726,7 @@ class Vehicle:
                     else:
                         l_square = l_square + 0.2 * l_square
                 else:
-                    l_square = l_square + 0.2 * l_square
+                    l_square = l_square + 0.2 * l_square"""
 
             """# This is not optimal, should find a better solution!
             for k in range(self.N):
@@ -755,7 +755,9 @@ class Vehicle:
                 dist.append(trajectories['traj '+str(i)]['distance'])
             id = dist.index(min(dist))"""
 
-            self.safe_set = {'radius': radius_safe_set,
+            center = np.array([[self.x], [self.y]])
+
+            self.safe_set = {'radius': 2,
                              'center': center,
                              'traj': traj_estimation,
                              'computed with traj': False}
@@ -914,7 +916,7 @@ class Vehicle:
             opti.solver('ipopt')
             sol = opti.solve()
         except Exception as e:
-            error()
+            return [], False, []
 
         x_c_opt = sol.value(x_c)
         y_c_opt = sol.value(y_c)
@@ -1089,7 +1091,7 @@ class Vehicle:
             self.trajecotry_estimation()
             opti.set_initial(X, self.traj_estimation)
             opti.set_initial(U, np.zeros((self.m, self.N)))
-            opti.set_initial(psi_b_x, np.zeros((np.size(b), self.N_SF + 1)))
+            opti.set_initial(psi_b_x, np.zeros((np.size(b), self.N + 1)))
             opti.set_initial(psi_v, 0)
             opti.set_initial(psi_f, 0)
         else:
@@ -1098,7 +1100,7 @@ class Vehicle:
             self.trajecotry_estimation()
             opti.set_initial(X, self.traj_estimation)
             opti.set_initial(U, np.zeros((self.m, self.N)))
-            opti.set_initial(psi_b_x, np.zeros((np.size(b), self.N_SF + 1)))
+            opti.set_initial(psi_b_x, np.zeros((np.size(b), self.N + 1)))
             opti.set_initial(psi_v, 0)
             opti.set_initial(psi_f, 0)
 
@@ -1129,6 +1131,15 @@ class Vehicle:
             self.previous_opt_sol['Cost'] = sol.value(cost)
             input = sol.value(U)[:, 0].reshape((self.m, 1))
             self.success_solver_MPC_LLM = True
+
+            """for k in range(self.N_SF + 1):  # Think if +1 make sense...
+                pos_slack = np.linalg.norm(self.previous_opt_sol['psi_b_x'][:, k])
+                if pos_slack > 1:
+                    error()
+            if abs(self.previous_opt_sol['psi_v']) > 0:
+                error()
+            if abs(self.previous_opt_sol['psi_f']) > 0:
+                error()"""
         else:
             self.previous_opt_sol['Cost'] = 10
             if not self.SF_active:
@@ -1245,7 +1256,7 @@ class Vehicle:
             self.previous_opt_sol['U'] = sol.value(U)
             #self.previous_opt_sol_SF['psi_b_x'] = sol.value(psi_b_x)
             if nr_ineq_const + nr_eq_const >= 1:
-                self.previous_opt_sol['epsilon_LLM_constraints'] = sol.value(epsilon_LLM_constraints)
+                self.previous_opt_sol['epsilon_LLM_constraints'] = sol.value(epsilon_LLM_constraints).reshape(nr_ineq_const + nr_eq_const, self.N + 1)
             else:
                 self.previous_opt_sol['epsilon_LLM_constraints'] = epsilon_LLM_constraints
             self.previous_opt_sol['Cost'] = sol.value(cost)
@@ -1632,7 +1643,7 @@ class Vehicle:
         cost += (psi_b_x[:, -1].T @ psi_b_x[:, -1])
         for j in range(np.size(b)):
             opti.subject_to(0 <= psi_b_x[j, -1])
-        opti.subject_to(A @ X[:, -1] + b <= - (self.N_SF + 1) * delta_i * np.ones(np.shape(b)) + psi_b_x[:, -1])
+        opti.subject_to(A @ X[:, -1] + b <= - self.N_SF * delta_i * np.ones(np.shape(b)) + psi_b_x[:, -1])
 
         # Control Barrier Function
         px_S = self.safe_set['center'][0]
@@ -1788,7 +1799,7 @@ class Vehicle:
         opti.subject_to(X[:, 0] == self.state)
 
         # Terminal Constraints
-        opti.subject_to(A @ X[:, -1] + b <= - (self.N_SF + 1) * delta_i * np.ones(np.shape(b)) + psi['psi_b_x'][:, -1].reshape(np.size(b), 1))
+        opti.subject_to(A @ X[:, -1] + b <= - self.N_SF * delta_i * np.ones(np.shape(b)) + psi['psi_b_x'][:, -1].reshape(np.size(b), 1))
 
         # Control Barrier Function
         px_S = self.safe_set['center'][0]

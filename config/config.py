@@ -21,11 +21,6 @@ def SimulationConfig():
                                'SF': {
                                    'Active': True,
                                    'Horizon': 20,
-                                   'Replan': {
-                                       'Active': False,
-                                       'toll': 10
-                                   },
-                                   'Use LLM output': False,
                                    'Soft': True
                                },
                                'LLM': {

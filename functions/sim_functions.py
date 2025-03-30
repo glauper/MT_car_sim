@@ -1,6 +1,7 @@
 import numpy as np
 import time
 from shapely.geometry import Polygon
+from scipy.spatial import Delaunay
 import random
 import os
 import json
@@ -58,8 +59,8 @@ def sim_init(counter, type_simulation):
         #ego_vehicle.trajectory_area_estimation()
         ego_vehicle.find_safe_set(agents, circular_obstacles)
         ego_vehicle.safe_set['computed in optimization'] = True
-        if not ego_vehicle.use_LLM_output_in_SF:
-            ego_vehicle.update_velocity_limits(env)
+        #if not ego_vehicle.use_LLM_output_in_SF:
+        ego_vehicle.update_velocity_limits(env)
     else:
         ego_vehicle = []
 
@@ -383,6 +384,30 @@ def normalize_angle(angle):
 def check_proximity(ego, agent):
     too_near = False
 
+    """R_agent = np.zeros((2, 2))
+    R_agent[0, 0] = np.cos(-agent.theta)
+    R_agent[0, 1] = -np.sin(-agent.theta)
+    R_agent[1, 0] = np.sin(-agent.theta)
+    R_agent[1, 1] = np.cos(-agent.theta)
+
+    #V_agent = R_agent @ np.array([[1.5], [0]])
+    #diff = R_agent @ (ego.position - (agent.position + V_agent))
+    diff = R_agent @ (ego.position - agent.position)
+
+    if (diff[0] / agent.a_security_dist) ** 2 + (diff[1] / agent.b_security_dist) ** 2 <= 1:
+        too_near = True"""
+
+    A_hull = agent.hull.equations[:, :-1]
+    b_hull = agent.hull.equations[:, -1]
+
+    if all(A_hull @ ego.position + b_hull.reshape(len(b_hull),1) <= 0):
+        too_near = True
+
+    return too_near
+
+def check_safe_zone(ego, agent):
+    too_near = False
+
     R_agent = np.zeros((2, 2))
     R_agent[0, 0] = np.cos(-agent.theta)
     R_agent[0, 1] = -np.sin(-agent.theta)
@@ -432,7 +457,7 @@ def check_crash(ego, agent):
 
     return crash_status
 
-def check_need_replan(ego_vehicle, agents, Language_Module, env, SimulationParam, run_simulation, next_task, too_near, ego_brake, t, counter):
+def check_need_replan(ego_vehicle, agents, Language_Module, env, SimulationParam, run_simulation, next_task, ego_brake, t, counter):
     # check if the task is finished, i.e. when LLM car is near enough to a waypoint
     print('Cost LLM ', ego_vehicle.previous_opt_sol['Cost'])
     if 'entry' in Language_Module.TP['tasks'][Language_Module.task_status]:
@@ -483,16 +508,16 @@ def check_need_replan(ego_vehicle, agents, Language_Module, env, SimulationParam
             end = time.time()
             counter['elapsed time for LLM'].append(end - start)
             counter['TP calls'] += 1
-        elif SimulationParam['Controller']['Ego']['SF']['Replan']['Active'] and ego_vehicle.previous_opt_sol_SF[
-            'Cost'] >= SimulationParam['Controller']['Ego']['SF']['Replan']['toll']:
-            print('Call TP: because SF cost are high')
-            ego_vehicle.t_subtask = 0
-            reason['SF_kicks_in'] = True
-            start = time.time()
-            Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
-            end = time.time()
-            counter['elapsed time for LLM'].append(end - start)
-            counter['TP calls'] += 1
+        #elif SimulationParam['Controller']['Ego']['SF']['Replan']['Active'] and ego_vehicle.previous_opt_sol_SF[
+        #    'Cost'] >= SimulationParam['Controller']['Ego']['SF']['Replan']['toll']:
+        #    print('Call TP: because SF cost are high')
+        #    ego_vehicle.t_subtask = 0
+        #    reason['SF_kicks_in'] = True
+        #    start = time.time()
+        #    Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
+        #    end = time.time()
+        #    counter['elapsed time for LLM'].append(end - start)
+        #    counter['TP calls'] += 1
         #elif too_near:
         #    print('Call TP: because an agent is to near')
         #    ego_vehicle.t_subtask = 0
@@ -502,31 +527,45 @@ def check_need_replan(ego_vehicle, agents, Language_Module, env, SimulationParam
         #    end = time.time()
         #    counter['elapsed time for LLM'].append(end - start)
         #    counter['TP calls'] += 1
-        elif not ego_vehicle.success_solver_MPC_LLM:
-            print('Call TP: because no success of MPC LLM.')
-            ego_vehicle.t_subtask = 0
-            reason['MPC_LLM_not_solved'] = True
-            start = time.time()
-            Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
-            end = time.time()
-            counter['elapsed time for LLM'].append(end - start)
-            counter['TP calls'] += 1
-            ego_vehicle.success_solver_MPC_LLM = True
-        elif SimulationParam['Controller']['Ego']['SF']['Active'] and not ego_vehicle.success_solver_SF:
-            ego_vehicle.t_subtask = 0
-            if SimulationParam['Controller']['Ego']['SF']['Soft']:
-                print('Call TP: because no success for solver soft SF.')
-                reason['soft_SF_not_solved'] = True
+        if not ego_brake:
+            replan_flag = False
+            if np.shape(ego_vehicle.previous_opt_sol['epsilon_LLM_constraints']) == int:
+                if ego_vehicle.previous_opt_sol['epsilon_LLM_constraints'] > 1:
+                    replan_flag = True
             else:
-                print('Call TP: because no success of SF.')
-                reason['SF_not_solved'] = True
-            start = time.time()
-            Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
-            end = time.time()
-            counter['elapsed time for LLM'].append(end - start)
-            counter['TP calls'] += 1
-            ego_vehicle.success_solver_SF = True
-        elif SimulationParam['Controller']['Ego']['SF']['Soft'] and not ego_brake:
+                for k in range(ego_vehicle.N_SF + 1):
+                    if len(np.shape(ego_vehicle.previous_opt_sol['epsilon_LLM_constraints'])) == 0:
+                        norm_slack = 0
+                    else:
+                        norm_slack = np.linalg.norm(ego_vehicle.previous_opt_sol['epsilon_LLM_constraints'][:, k])
+                    if norm_slack > 1:
+                        replan_flag = True
+            if replan_flag:
+                print('Call TP: because slack variables of MPC LLM are high.')
+                ego_vehicle.t_subtask = 0
+                reason['MPC_LLM_not_solved'] = True
+                start = time.time()
+                Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
+                end = time.time()
+                counter['elapsed time for LLM'].append(end - start)
+                counter['TP calls'] += 1
+                counter['recall due to CM'] += 1
+                ego_vehicle.success_solver_MPC_LLM = True
+        #elif SimulationParam['Controller']['Ego']['SF']['Active'] and not ego_vehicle.success_solver_SF:
+        #    ego_vehicle.t_subtask = 0
+        #    if SimulationParam['Controller']['Ego']['SF']['Soft']:
+        #        print('Call TP: because no success for solver soft SF.')
+        #        reason['soft_SF_not_solved'] = True
+        #    else:
+        #        print('Call TP: because no success of SF.')
+        #        reason['SF_not_solved'] = True
+        #    start = time.time()
+        #    Language_Module.recall_TP(env, SimulationParam['Query'], agents, ego_vehicle, reason, t)
+        #    end = time.time()
+        #    counter['elapsed time for LLM'].append(end - start)
+        #    counter['TP calls'] += 1
+        #    ego_vehicle.success_solver_SF = True
+        if SimulationParam['Controller']['Ego']['SF']['Soft'] and not ego_brake:
             replan_flag = False
             slack_time_t = {}
             for k in range(ego_vehicle.N_SF): # Think if +1 make sense...
@@ -604,6 +643,7 @@ def check_need_replan(ego_vehicle, agents, Language_Module, env, SimulationParam
                     slack_time_t['X_safe and X_LLM diverges'] = np.linalg.norm(ego_vehicle.previous_opt_sol_SF['X'][0:2, -1] - ego_vehicle.previous_opt_sol['X'][0:2, -1])
             if replan_flag == True:
                 counter['slack SF'].append({'Time '+ str(t): slack_time_t})
+                counter['recall due to SM'] += 1
                 print('Call TP: because the slack variable of soft SF are higher then treshold.')
                 ego_vehicle.t_subtask = 0
                 reason['soft_SF_kicks_in'] = True
@@ -615,4 +655,3 @@ def check_need_replan(ego_vehicle, agents, Language_Module, env, SimulationParam
                 ego_vehicle.success_solver_SF = True
 
     return run_simulation, counter
-

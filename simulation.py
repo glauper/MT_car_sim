@@ -6,7 +6,7 @@ import json
 import os
 from functions.plot_functions import plot_simulation, input_animation, save_all_frames
 from functions.sim_functions import (results_update_and_save, sim_init, sim_reload, check_proximity, check_crash,
-                                          check_need_replan)
+                                          check_need_replan, check_safe_zone)
 
 path_folder= os.path.join(os.path.dirname(__file__), ".", f"prompts/output_LLM/frames/")
 shutil.rmtree(path_folder)
@@ -17,9 +17,8 @@ counter = {'crash': 0,
            'OD calls':0,
            'elapsed time for LLM': [],
            'too_near': 0,
-           'fail solver MPC LLM': 0,
-           'fail solver SF': 0,
-           'fail solver soft SF': 0,
+           'recall due to SM': 0,
+           'recall due to CM': 0,
            'slack SF': []}
 type_simulation = "safe_narrate"
 (SimulationParam, env, agents, ego_vehicle, Language_Module, presence_emergency_car, order_optimization, priority,
@@ -33,6 +32,8 @@ ego_brake = False
 while run_simulation:
     print("Simulation time: ", t)
     if SimulationParam['With LLM car']:
+        print(Language_Module.task_status)
+        print(Language_Module.TP['tasks'])
         print('Task: ', Language_Module.TP['tasks'][Language_Module.task_status])
         if SimulationParam['Controller']['Ego']['LLM']['Reasoning']:
             print('Reasons: ', Language_Module.TP['reasons'][Language_Module.task_status])
@@ -48,7 +49,7 @@ while run_simulation:
     # Controller to decide the trajectory of other agents
     other_agents = {}
     input = {}
-    too_near = False
+    #too_near = False
     for name_vehicle in order_optimization:
         id_vehicle = int(name_vehicle)
         if agents[name_vehicle].type in env['Pedestrians Specification']['types']:
@@ -83,18 +84,6 @@ while run_simulation:
             agents[name_vehicle].trajectory_area_estimation()
             input[f'agent {id_vehicle}'] = agents[name_vehicle].trackingMPC(other_agents, ego_vehicle, circular_obstacles, t)
             other_agents[name_vehicle] = agents[name_vehicle]
-            if SimulationParam['With LLM car']:
-                # Here if a vehicle is more near then the security distance from the LLM car, the LLM car will brake and replan
-                if check_proximity(ego_vehicle, agents[name_vehicle]):
-                    counter['too_near'] += 1
-                    too_near = True
-                    """if 'brakes()' in Language_Module.TP['tasks'][Language_Module.task_status]:
-                        too_near = False
-                    else:
-                        if not SimulationParam['Controller']['Ego']['SF']['Soft']:
-                            too_near = True
-                        else:
-                            too_near = False"""
 
     # Here all the steps for the LLM car
     if SimulationParam['With LLM car']:
@@ -190,13 +179,14 @@ while run_simulation:
                 counter['OD calls'] += 1
 
             # Here MPC with LLM output
-            if not SimulationParam['Controller']['Ego']['LLM']['Soft']:
-                #input_ego = ego_vehicle.MPC_LLM(agents, circular_obstacles, t, Language_Module)
-                error()
-            else:
+            if SimulationParam['Controller']['Ego']['LLM']['Soft']:
                 input_ego = ego_vehicle.Control_Module(agents, circular_obstacles, t, Language_Module)
+            else:
+                # input_ego = ego_vehicle.MPC_LLM(agents, circular_obstacles, t, Language_Module)
+                error()
 
             if not ego_vehicle.success_solver_MPC_LLM:
+                error()
                 Language_Module.final_messages.append({'Vehicle': 'No success for MPC LLM solver',
                                                        'time': t})
                 counter['fail solver MPC LLM'] += 1
@@ -211,7 +201,6 @@ while run_simulation:
                     info = {'street speed limit': ego_vehicle.final_target['max vel']}
                 # Soft SF
                 if SimulationParam['Controller']['Ego']['SF']['Soft']:
-                    #input_ego = ego_vehicle.soft_SF(input_ego, agents, circular_obstacles, t, info)
                     psi = ego_vehicle.psi_optimization(agents, circular_obstacles, t, info)
                     input_ego = ego_vehicle.soft_SF_psi_opt(input_ego, agents, circular_obstacles, t, info, psi)
                     print('Cost soft SF ', ego_vehicle.previous_opt_sol_SF['Cost'])
@@ -220,15 +209,17 @@ while run_simulation:
                                                                'time': t})
                         counter['fail solver soft SF'] += 1
                         numeric_error_solver_SF()
-                else: # Hard SF
-                    input_ego = ego_vehicle.SF(input_ego, agents, circular_obstacles, t, Language_Module, info)
-                    print('Cost SF ', ego_vehicle.previous_opt_sol_SF['Cost'])
-                    if not ego_vehicle.success_solver_SF:
-                        Language_Module.final_messages.append({'Vehicle': 'No success for SF solver',
-                                                               'time': t})
-                        counter['fail solver SF'] += 1
+                else:
+                    error()
 
     if SimulationParam['With LLM car']:
+        for id_vehicle, name_vehicle in enumerate(agents):
+            # Here if a vehicle is more near then the security distance from the LLM car, the LLM car will brake and replan
+            if check_proximity(ego_vehicle, agents[name_vehicle]):
+                counter['too_near'] += 1
+            if agents[name_vehicle].security_dist != 0:
+                if check_safe_zone(ego_vehicle, agents[name_vehicle]):
+                    ego_brake = True
         # Dynamics propagation
         if ego_brake:
             ego_vehicle.brakes()
@@ -284,7 +275,7 @@ while run_simulation:
     # Check if some flag say that a replan of TP is needed for LLM car
     if SimulationParam['With LLM car']:
         run_simulation, counter = check_need_replan(ego_vehicle, agents, Language_Module, env, SimulationParam,
-                                           run_simulation, next_task, too_near, ego_brake, t, counter)
+                                           run_simulation, next_task, ego_brake, t, counter)
         for name_agent in agents:
             if agents[name_agent].type == 'emergency car':
                 if agents[name_agent].exiting:
@@ -305,7 +296,7 @@ while run_simulation:
         if all(reach_end_target):
             run_simulation = False
 
-    if t == 400:
+    if t == 300:
         counter['motivation'] = 'End simulation: because max simulation steps are reached.'
         run_simulation = False
     elif counter['TP calls'] >= 25:
@@ -326,7 +317,8 @@ if SimulationParam['With LLM car']:
     #    json.dump(Language_Module.DE, file)
     if SimulationParam['Controller']['Ego']['SF']['Soft']:
         print('Slack variables bigger then zero: ', counter['slack SF'])
-        print('How many times TP is called due to soft SF: ', len(counter['slack SF']))
+        print('How many times TP is called due to Safety Module: ', counter['recall due to SM'])
+        print('How many times TP is called due to Control Module: ', counter['recall due to CM'])
     elif SimulationParam['Controller']['Ego']['SF']['Active']:
         print('How many times solver SF failed: ', counter['fail solver SF'])
 
@@ -334,7 +326,6 @@ if SimulationParam['With LLM car']:
     print('How many times TP is called: ', counter['TP calls'])
     print('How many times OD is called: ', counter['OD calls'])
     print('How many invasion of security area: ', counter['too_near'])
-    print('How many times solver MPC LLM failed: ', counter['fail solver MPC LLM'])
     counter['Mean time for LLM'] = np.mean(counter['elapsed time for LLM'])
     print('Mean elapsed time for LLM to give output: ', counter['Mean time for LLM'])
     print('Motivation: ', counter['motivation'])
