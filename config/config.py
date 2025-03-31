@@ -10,8 +10,8 @@ def SimulationConfig():
                        'Timestep': 0.1, # [s]
                        'Environment': 0,
                        #'Query': 'go straight to the exit in front of you',
-                       #'Query': 'go to the exit on the right',
-                       'Query': 'go to the exit on the left',
+                       'Query': 'go to the exit on the right',
+                       #'Query': 'go to the exit on the left',
                        'Controller': {
                            'Agents': {
                                'Type': "tracking MPC",
